@@ -81,8 +81,12 @@ class Dataloader:
 
         return daily_ret.to_frame("1D")
 
-    def load_industry(self, industry_filename: str) -> pd.DataFrame:
+    def return_transformer():
         pass
+
+    def load_industry(self, industry_filename: str) -> pd.DataFrame:
+        ind_frame = pd.read_csv(self.data_path + industry_filename)
+        
         
 
 
