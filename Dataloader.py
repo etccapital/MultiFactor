@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 from datetime import datetime, timedelta
 
 def weekday_between(start: str, end: str):
@@ -23,6 +24,11 @@ def weekday_between(start: str, end: str):
         start_obj += timedelta(days=1)
 
     return date
+
+def format_asset_name(asset_name: pd.Index):
+    SZ = asset_name[np.where(asset_name.astype(int) < 100000)].astype(str).str.pad(6, side='left', fillchar='0').map('SZ{}'.format)
+    SH = asset_name[np.where(asset_name.astype(int) >= 100000)].astype(str).str.pad(6, side='left', fillchar='0').map('SH{}'.format)
+
 
 class Dataloader:
     """A class that abstracts the loading process of factor and return data
@@ -57,8 +63,15 @@ class Dataloader:
         for tdate in weekday_between(start_date, end_date):
             try:
                 curr_day = pd.read_csv(self.data_path + factor_name +f'/{tdate}.csv')[col_name]
+                
+                # Pad the asset code and prefixes
+                asset_name = curr_day.index.astype(int)
+                SZ = asset_name[np.where(asset_name < 100000)].astype(str).str.pad(6, side='left', fillchar='0').map('SZ{}'.format)
+                SH = asset_name[np.where(asset_name >= 100000)].astype(str).str.pad(6, side='left', fillchar='0').map('SH{}'.format)
+
                 curr_day['date'] = tdate
-                curr_day['asset'] = curr_day.index.values
+                curr_day['asset'] = SZ.union(SH).values
+
                 factor_data = factor_data.append(curr_day)
             except:
                 # raise Exception(f"IOError for file {str(tdate)}")
@@ -76,6 +89,16 @@ class Dataloader:
             A pandas dataframe object with multiindex (date, asset)
         """
         daily_ret = pd.read_csv(self.data_path + ret_filename)
+        asset_name = daily_ret.columns[1:].astype(int)
+
+        # Pad the asset code and add corresponding prefixes 
+        SZ = asset_name[np.where(asset_name < 100000)].astype(str).str.pad(6, side='left', fillchar='0').map('SZ{}'.format)
+        SH = asset_name[np.where(asset_name >= 100000)].astype(str).str.pad(6, side='left', fillchar='0').map('SH{}'.format)
+        
+        # Combine all indexes
+        daily_ret.columns = pd.Index(['Trddt']).union(SZ, sort=False).union(SH, sort=False)
+        
+        # Transform the table into desired shape
         daily_ret = daily_ret.set_index('Trddt').stack()
         daily_ret = daily_ret.rename_axis(['date', 'asset'])
 
