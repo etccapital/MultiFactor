@@ -2,12 +2,15 @@ import rqdatac as rq
 import numpy as np
 import pandas as pd
 import os
-# from utils import normalize_code
+import json
 
-# MAKE SURE CREDENTIALS ARE NOT COMMITTED TO GITHUB
-RQ_USER = 'license'
-RQ_PASS = 'QhhTnnWjN5eWgeBzXChE-d4iqymtu4-6XIBIjcO4Oh339_i0W1LifdY980vuXMEq-Zxz03HTXeItx7cK-704N0Go8i7DERQjkXQIirqt6l4ZTVJIcJbC1Vh62p5npTupQN0F9SyXTIoE1UQPacRqhHUSWHQm4yNFQW2nHffVVlY=Th4zB2-UYw5Q76xBPpPrLCKIjzpVid9Wogpi8QP9Ju8M7ZRUXzA9V6TmKCWOlCrTPBWnA8HAjEL-3hM55cAac-hzVADGoxpfV4tHA79mMsjOCREOTXzQH6rqcqUuEDuzShSWFB069fRSetK3yzgeeRdqocHmJ4ATA3a3pCcAVpA='
+# Use rq_crendential.json to fill out Ricequant credentials
+# WARNING: MAKE SURE rq_crendential.json ARE NOT COMMITTED TO GITHUB
+CRED_FILE = './rq_credential.json'
+with open(CRED_FILE) as file:
+    rq_cred = json.load(file)
 
+RQ_USER, RQ_PASS = rq_cred['user'], rq_cred['password']
 DATAPATH = './data/'
 
 def rq_initialize():
@@ -27,7 +30,7 @@ def load_price_data():
 
     return price_data
 
-def load_factor_data(factor: np.array) -> pd.DataFrame:
+def load_factor_data(factor: str) -> pd.DataFrame:
     ''' Something something
 
     '''
