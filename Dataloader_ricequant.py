@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import os
 import json
+import pathos
 
 # Use rq_crendential.json to fill out Ricequant credentials
 # WARNING: MAKE SURE rq_crendential.json ARE NOT COMMITTED TO GITHUB
@@ -16,18 +17,19 @@ DATAPATH = './data/'
 def rq_initialize():
     rq.init(RQ_USER, RQ_PASS)
 
-def load_price_data():
+def load_price_data(col='close') -> pd.DataFrame: 
+    #concatenate the price column from each csv using parrallel processing
+    
+    DATAPATH = './data/'
     stock_path = DATAPATH + 'stock_data/'
     stock_names = os.listdir(path=stock_path)
-    initial = pd.read_csv(stock_path + stock_names[0]).set_index('date')
-    initial = initial[['close']].rename({'close':initial.iloc[0,0]},axis=1)
-    price_data = initial
+    def get_close(name):
+        return pd.read_csv(stock_path+name).set_index(['date'])[col].rename(name.split('.')[0])
 
-    for name in stock_names[1:]:
-        stock_data = pd.read_csv(stock_path+name).set_index(['date'])
-        close_price = stock_data[['close']].rename({'close':stock_data.iloc[0,0]}, axis=1)
-        price_data = price_data.join(close_price)
-
+    with pathos.multiprocessing.ProcessPool(pathos.helpers.cpu_count()) as pool:
+        results = pool.imap(get_close, stock_names)
+    
+    price_data = pd.concat(results, axis=1)
     return price_data
 
 def load_factor_data(factor: str) -> pd.DataFrame:
