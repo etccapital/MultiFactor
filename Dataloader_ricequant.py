@@ -16,7 +16,7 @@ with open(CRED_FILE) as file:
 
 RQ_USER, RQ_PASS = rq_cred['user'], rq_cred['password']
 
-def rq_initialize():
+def rq_initialize(): 
     rq.init(RQ_USER, RQ_PASS)
 
 def normalize_code(symbol, pre_close=None):
@@ -75,7 +75,8 @@ def load_basic_info():
     #returns a list containing many dataframes, each corresponding to a stock
 
     def get_df(name):
-        return pd.read_csv(stock_path+name).set_index(['date'])
+        return pd.read_csv(stock_path+name)
+        # return pd.read_csv(stock_path+name).set_index(['date'])
 
     with pathos.multiprocessing.ProcessPool(pathos.helpers.cpu_count()) as pool:
         results = pool.map(get_df, csv_names)
@@ -89,8 +90,51 @@ def load_price_data(col='close'):
     price_data.columns = stock_names
     return price_data
 
+def load_industry_mapping():
+    if not os.path.exists("./Data/raw_data/industry_mapping.h5"):
+        indus_to_stock = {industry: rq.industry(industry) for industry in industry_codes}
+        stock_to_indus = {}
+        for indus, stock_names in indus_to_stock.items():
+            for stock in stock_names:
+                if stock in stock_to_indus: print(f"{stock} repeated!")
+                stock_to_indus[stock] = indus
+        df_indus_mapping = pd.Series(stock_to_indus, name='secon_indus_code').to_frame()
+        df_indus_mapping['pri_indus_code'] = df_indus_mapping['secon_indus_code'].str[0]
+        df_indus_mapping.to_hdf("./Data/raw_data/industry_mapping.h5", key='industry_mapping')
+    df_indus_mapping = pd.read_hdf("./Data/raw_data/industry_mapping.h5", key='industry_mapping')
+    return df_indus_mapping
+
+def load_st_data(stock_names) -> pd.DataFrame:
+    """
+    stock_names: an iterable of stock names
+    returns: a multindex(date and stockname) dataframe indicating whether a stock is an ST stock on a given date
+    """
+    #if the dataframe is not stored in the local folder then we fetch it first
+    if not os.path.exists('./Data/raw_data/is_st.h5'):
+        df_is_st = rq.is_st_stock(stock_names, START_DATE, END_DATE).stack()
+        df_is_st.to_hdf('./Data/raw_data/is_st.h5', key='is_st')
+    #load the dataframe
+    df_is_st = pd.read_hdf('./Data/raw_data/is_st.h5', key='is_st')
+    df_is_st = df_is_st[df_is_st.index.get_level_values(1).isin(stock_names)]
+    return df_is_st
+
+def load_suspended_data(stock_names):
+    """
+    stock_names: an iterable of stock names
+    returns: a multindex(date and stockname) dataframe indicating whether a stock is a suspended stock on a given date
+    """
+    #if the dataframe is not stored in the local folder then we fetch it first
+    if not os.path.exists('./Data/raw_data/is_suspended.h5'):
+        df_is_suspended = rq.is_suspended_stock(stock_names, START_DATE, END_DATE).stack()
+        df_is_suspended.to_hdf('./Data/raw_data/is_suspended.h5', key='is_suspended')
+    #load the dataframe
+    df_is_suspended = pd.read_hdf('./Data/raw_data/is_suspended.h5', key='is_suspended')
+    df_is_suspended = df_is_suspended[df_is_suspended.index.get_level_values(1).isin(stock_names)]
+    return df_is_suspended
+
 def load_listed_dates():
     #get the listed date for each stock
+    #the listed date of a stock is the earliest date in the stock's csv under ./Data/stock_data
     if not os.path.exists("./Data/raw_data/listed_dates"):
         results = load_basic_info()
         listed_dates = [result.index.min() for result in results]
@@ -101,7 +145,6 @@ def load_listed_dates():
 
 def load_factor_data(factor: str) -> pd.DataFrame:
     ''' Something something
-
     '''
     try:
         factor_data = pd.read_hdf(DATAPATH + f'factor/{factor}.h5')
@@ -110,7 +153,8 @@ def load_factor_data(factor: str) -> pd.DataFrame:
             
     return factor_data
 
-def download_factor_data(stock_name: np.array, factor_name: str, startdate: str, enddate: str) -> None:
-    factor_frame = rq.get_factor(stock_name, factor_name, startdate, enddate)
-    factor_frame.to_hdf(DATAPATH + f'factor/{factor_name}.h5', key='factor')
+def download_factor_data(stock_names: np.array, factor_name: str, startdate: str, enddate: str) -> None:
+    if not os.path.exists(f"./Data/factor/{factor_name}.h5"):
+        factor_frame = rq.get_factor(stock_names, factor_name, startdate, enddate)
+        factor_frame.to_hdf(DATAPATH + f'factor/{factor_name}.h5', key='factor')
 
