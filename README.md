@@ -34,7 +34,7 @@ To inspect packages installed or to make changes:
 ---
 
 ## Version Control of .ipynb Files
-Currently, we have the following notebooks on our local laptops: data_download_and_process.ipynb   Alphalens_single_factor_testing.ipynb 
+Currently, we have the following notebooks on our local laptops: `data_download_and_process.ipynb`   `Alphalens_single_factor_testing.ipynb`
 However, version control will be impossible if we directly push them to the repo in the form of .ipynb files. This is because jupyter notebooks are               json files and cannot be displayed properly in github. As a result, we will use jupytext(`pip install jupytext --upgrade`) to convert between .ipynb and .py files, and store only .py files in the shared repo. Taking data_download_and_process.ipynb as an example, when you finish editing it on your local laptop, run `jupytext --to py:percent --update data_download_and_process.ipynb` in CMD and the changes will be updated to data_download_and_process.py. Then you can merge changes and resolve conflicts in data_download_and_process.py as in other python files. To fetch changes from data_download_and_process.py to data_download_and_process.ipynb, run `jupytext --to notebook --update data_download_and_process.py` in CMD. Note that the `--update` option is essential as it will only update the code and comments in the .ipynb file while preserving graphs and outputs.
 
 ## Workflow
