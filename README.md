@@ -21,7 +21,9 @@ To set up the project, first install anaconda and github cli. (Currently only co
 
 6. Download `rq_crendential.json` and save it to root project folder
 
-7. Open `Alphalens_single_factor_testing.ipynb` and run the import cell to make sure all packages are instaslled properly
+7. Convert target python files into jupyter notebooks. See "Version Control of .ipynb Files" section below.
+
+8. Open `Alphalens_single_factor_testing.ipynb` and run the import cell to make sure all packages are installed properly
 
 To inspect packages installed or to make changes:
 
@@ -30,6 +32,10 @@ To inspect packages installed or to make changes:
 2. Use `conda activate multifactor`
 
 ---
+
+## Version Control of .ipynb Files
+Currently, we have the following notebooks on our local laptops: data_download_and_process.ipynb   Alphalens_single_factor_testing.ipynb 
+However, version control will be impossible if we directly push them to the repo in the form of .ipynb files. This is because jupyter notebooks are               json files and cannot be displayed properly in github. As a result, we will use jupytext(`pip install jupytext --upgrade`) to convert between .ipynb and .py files, and store only .py files in the shared repo. Taking data_download_and_process.ipynb as an example, when you finish editing it on your local laptop, run `jupytext --to py:percent --update data_download_and_process.ipynb` in CMD and the changes will be updated to data_download_and_process.py. Then you can merge changes and resolve conflicts in data_download_and_process.py as in other python files. To fetch changes from data_download_and_process.py to data_download_and_process.ipynb, run `jupytext --to notebook --update data_download_and_process.py` in CMD. Note that the `--update` option is essential as it will only update the code and comments in the .ipynb file while preserving graphs and outputs.
 
 ## Workflow
 
@@ -41,7 +47,7 @@ To inspect packages installed or to make changes:
 
 4. (Optional) analyze missing values in price and factor with `data_download_and_process.ipynb`
 
-5. Run `Alphalens_single_factor_testing.ipynb` to examin single factor testing result
+5. Run `Alphalens_single_factor_testing.ipynb` to examine single factor testing result
 
 ---
 
