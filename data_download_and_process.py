@@ -71,13 +71,11 @@ df_indus_mapping = dl.load_industry_mapping()
 
 # %%
 # CSI 300 沪深300
-df_index = pd.read_csv(dl.DATAPATH + 'index_data/' + 'sh000300.csv',usecols=['date', 'open','close','change'],index_col=['date']).sort_index(ascending=True)
-df_index.columns = ['CSI_300_' + col for col in df_index.columns]
-df_index.index = df_index.index.values.astype('datetime64')
-df_index
+index = pd.read_csv(dl.DATAPATH + 'index_data/' + 'sh000300.csv',usecols=['date', 'open','close','change'],index_col=['date']).sort_index(ascending=True)
+index
 
 # %%
-((df_index['CSI_300_change'] + 1).cumprod() - 1).plot()
+((index['change'] + 1).cumprod() - 1).plot()
 
 # %% [markdown]
 # #### Download factor data
@@ -88,8 +86,8 @@ with open('./Data/raw_data/stock_names.h5', 'rb') as fp:
 
 # %%
 # value factor
-# value = ['pe_ratio_ttm','pcf_ratio_ttm', 'pcf_ratio_total_ttm','pb_ratio_ttm','book_to_market_ratio_ttm','dividend_yield_ttm', 'ps_ratio_ttm']
-# dl.download_factor_data(stock_names, value, START_DATE,END_DATE)
+value = ['pe_ratio_ttm','pcf_ratio_ttm', 'pcf_ratio_total_ttm','pb_ratio_ttm','book_to_market_ratio_ttm','dividend_yield_ttm', 'ps_ratio_ttm']
+dl.download_factor_data(stock_names, value, START_DATE,END_DATE)
 
 # %% [markdown]
 # ### Data Preprocessing Part 1
@@ -101,7 +99,7 @@ with open('./Data/raw_data/stock_names.h5', 'rb') as fp:
 #
 # 1) Filter out data before START_DATE and after END_DATE(backtesting period) from the raw stock data. 
 #
-# - 剔除不在回测区间内的信息
+# - 剔除不在回测区间内的股票信息
 #
 # 2) Filter listed stocks
 #
@@ -130,31 +128,19 @@ stock_names = df_backtest.index.get_level_values(1).unique()
 stock_names
 
 # %%
-pd.Timedelta('1y')
-
-# %%
-df_backtest.index.get_level_values(level=0)
-
-# %%
-df_backtest['listed_date'].values
-
-# %%
-listed_dates.astype('datetime64')
-
-# %%
 # step 2
 # get the listed date
 listed_dates = {dl.normalize_code(result['code'][0]): result['date'].min() for result in results}
-listed_dates = pd.DataFrame(pd.Series(listed_dates), columns=['listed_date']).sort_index().astype('datetime64')
+listed_dates = pd.DataFrame(pd.Series(listed_dates), columns=['listed_date']).sort_index()
 # left join with dataframe 'listed_dates'
 df_backtest = df_backtest.merge(listed_dates, left_on = 'stock', right_index=True, how='left')
 # create a new variable called 'is_listed' to check if a certain stock is listed at that given date
-df_backtest['is_listed_for_one_year'] = (df_backtest.index.get_level_values(level=0) - df_backtest['listed_date'] >= pd.Timedelta('1y'))
+df_backtest['is_listed'] = (df_backtest.index.get_level_values(level=0) >= df_backtest['listed_date'])
 
 # %%
 # number of non-listed stocks along the time
-non_listed = df_backtest[~df_backtest['is_listed_for_one_year']]
-num_nonlisted_stock = non_listed.groupby(level=0).count()['is_listed_for_one_year']
+non_listed = df_backtest[df_backtest['is_listed'] == False]
+num_nonlisted_stock = non_listed.groupby(level=0).count()['is_listed']
 num_nonlisted_stock.plot.line()
 
 # %%
@@ -166,16 +152,14 @@ df_is_st = dl.load_st_data(stock_names)
 df_is_suspended = dl.load_suspended_data(stock_names)
 
 # %%
-df_backtest
-
-# %%
 # step 3
 #create ST and suspended columns
 df_backtest['is_st'] = df_is_st.values
 df_backtest['is_suspended'] = df_is_suspended.values
-#filter out stocks that are listed within a year
+# filter out stocks that are listed within a year
+df_backtest = df_backtest[df_backtest['listed_date']<'2020-01-01']
 #filter out ST and suspended stocks, filter data by the stock's listed date
-df_backtest = df_backtest.loc[ (~df_backtest['is_st']) & (~df_backtest['is_suspended']) & (df_backtest['is_listed_for_one_year']), BASIC_INFO_COLS]
+df_backtest = df_backtest.loc[ (~df_backtest['is_st']) & (~df_backtest['is_suspended']) & (df_backtest['is_listed']), BASIC_INFO_COLS]
 #keep data only on the rebalancing dates
 rebalancing_dates = pd.date_range(start=START_DATE, end=END_DATE, freq='BM')
 df_backtest = df_backtest[df_backtest.index.get_level_values(0).isin(rebalancing_dates)]
@@ -192,10 +176,14 @@ df_backtest['next_period_return'] = (df_backtest['next_period_open'].values - df
 df_backtest = df_backtest[df_backtest.index.get_level_values(0) != df_backtest.index.get_level_values(0).max()]
 
 # %%
-df_preprocess1 = df_backtest.copy()
+df_preprocess1 = df_backtest
 
 # %%
 df_backtest
+
+# %%
+nan = df_backtest.loc['2020-11-30','688368.XSHG'][0]
+nan
 
 
 # %% [markdown]
@@ -206,17 +194,17 @@ df_backtest
 #
 
 # %%
-def remove_outlier(df, n=3,):
+def remove_outlier(df, n=3, nan=nan):
     #for any factor, if the stock's factor exposure lies more than n times MAD away from the factor's median, 
-    # reset that stock's factor exposure to median + n * MAD/median - n * MAD
+    # reset that stock's factor exposure to median + n * MAD/median - n* MAD
     med = df.median(axis=0)
     MAD = (df - med).abs().median()
     upper_limit = med + n * MAD
     lower_limit = med - n * MAD
     print(f"lower_limit = {lower_limit}, upper_limit = {upper_limit}")
     #pd.DataFrame.where replaces data in the dataframe by 'other' where the condition is False
-    df = df.where(~( (df > upper_limit) & df.notnull() ) , other = upper_limit, axis=1)
-    df = df.where(~( (df < lower_limit) & df.notnull() ), other = lower_limit, axis=1)
+    df = df.where((df <= upper_limit) | (df != nan) , other = upper_limit, axis=1)
+    df = df.where((df >= lower_limit) | (df != nan), other = lower_limit, axis=1)
     return df
 
 
@@ -240,21 +228,7 @@ def standardize(df):
 df_preprocess1[TEST_FACTORS] = applyParallel(df_preprocess1[TEST_FACTORS].groupby(level=0), standardize).values
 
 # %%
-df = df_preprocess1.loc[df_preprocess1.index.get_level_values(0) == '2011-01-31', TEST_FACTORS]
-df
-
-# %%
-df2 = (df - df.mean()) / df.std()
-
-# %%
-df2.mean()
-
-# %%
-df2.std()
-
-# %%
-#after rebalancing, on each rebalancing date, each standardized factor has mean 0 and std 1
-df_preprocess1.groupby(level=0)[TEST_FACTORS].agg(['mean', 'std'])
+df_preprocess1
 
 # %%
 df_preprocess1[TEST_FACTORS] = df_preprocess1[TEST_FACTORS].fillna(0).values
@@ -263,13 +237,14 @@ df_preprocess1[TEST_FACTORS] = df_preprocess1[TEST_FACTORS].fillna(0).values
 df_preprocess1
 
 # %%
-#data missing issue, simply filter them out
-#this may cause the factor test results in later stages to be incorrectly calculated
-#the magnitude of error depends on proportion of missing values
+#data missing issue, simply filter them out, otherwise would negatively impact later results
 df_preprocess1 = df_preprocess1[df_preprocess1['next_period_return'].notnull() & df_preprocess1['market_value'].notnull()]
 
 # %%
-df_backtest = df_preprocess1.copy()
+df_backtest = df_preprocess1
+
+# %%
+df_preprocess1
 
 # %% [markdown]
 # # Single-Factor Backtesting
@@ -299,11 +274,12 @@ df_backtest
 # 回归法
 
 # %%
-def wls_tval_coef(df, SINGLE_FACTOR):
+def wls_tval_coef(df):
     #obtain the t-value in WLS of the tested factor
     # 函数内需要用包要额外在这里加上
     import statsmodels.formula.api as smf
     import pandas as pd
+    SINGLE_FACTOR = 'PE_TTM'
 
     # Weighted Least Square(WLS) uses the square root of market cap of each stock
     # 使用加权最小二乘回归，并以个股流通市值的平方根作为权重
@@ -319,16 +295,8 @@ def wls_tval_coef(df, SINGLE_FACTOR):
 
 # %%
 #get the t-value for all periods
-from functools import partial
-SINGLE_FACTOR = 'PE_TTM'
-wls_results_tval_coef = applyParallel(df_backtest.groupby(level=0), partial(wls_tval_coef, SINGLE_FACTOR=SINGLE_FACTOR))
+wls_results_tval_coef = applyParallel(df_backtest.groupby(level=0), wls_tval_coef)
 wls_results_tval_coef.index = df_backtest.index.get_level_values(level=0).unique()
-
-# %%
-wls_results_tval_coef['t_value'].plot()
-
-# %%
-wls_results_tval_coef['coef'].plot()
 
 # %%
 # get a summary result from the t-value series
@@ -428,9 +396,6 @@ from functools import partial
 assigned_group = df_backtest.groupby('pri_indus_code')['PE_TTM'].apply(partial(pd.qcut, q=5, labels=range(5)))
 
 # %%
-df_backtest
-
-# %%
 fig = plt.figure(figsize = (10, 5))
 num_stocks_per_indus = df_backtest[df_backtest.index.get_level_values(0) == '2011-01-31'].groupby('pri_indus_code')['PE_TTM'].count()
 
@@ -439,10 +404,6 @@ plt.bar(*zip(*num_stocks_per_indus.items()))
 plt.xlabel("Industry")
 plt.ylabel("Number of Companies")
 plt.show()
-
-# %%
-df_backtest = df_backtest.merge(df_index, how='left', left_on='date', right_index=True, )
-df_backtest
 
 # %%
 #Here for simplicity we assume that index weight is a uniform portfolio over all stocks, to be modified later
@@ -464,7 +425,7 @@ df_backtest
 
 # %%
 import numpy as np
-# hiearchical backtesting is pretty hard to implement using pure vectorization/parrallelization, and I have to use for loop at least once.
+# hiearchical backtesting is pretty hard to implement using purely vectorization/parrallelization, and I have to use for loop at least once.
 def get_group_weight_by_industry(num_stocks, num_groups) -> np.array:
     """
     precondition: the stocks need to be sorted by factor exposure
@@ -472,9 +433,10 @@ def get_group_weight_by_industry(num_stocks, num_groups) -> np.array:
     @num_groups: the number of portfolio groups to be constructed
     
     returns: an intermediary (num_stocks x num_groups) weight matrix specifying the weight of 
-             each stock in each group. This is not the final weight matrix because there are many industries, so that the final weights within 
-             each group should be smaller than 1. Here the returned
-             weight matrix represents the weight distribution within a single industry, so the weights adds up to 1.
+             each stock in each group. Here weights within each group(column sum) adds up to 1.
+             This is not the final weight matrix because there are many industries(so that weights within 
+             each group should actually be smaller than one) but the returned
+             weight matrix represents only one industry. 
     
     if you want to understand the algorithm deeper, print some intermediary outputs
     """
