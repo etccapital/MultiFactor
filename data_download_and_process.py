@@ -22,7 +22,7 @@ import Dataloader_ricequant as dl
 import pandas as pd
 import rqdatac as rq
 from constants import *
-import scipy
+# import scipyxf
 import statsmodels as sm
 import numpy as np
 import seaborn as sns
@@ -71,11 +71,13 @@ df_indus_mapping = dl.load_industry_mapping()
 
 # %%
 # CSI 300 沪深300
-index = pd.read_csv(dl.DATAPATH + 'index_data/' + 'sh000300.csv',usecols=['date', 'open','close','change'],index_col=['date']).sort_index(ascending=True)
-index
+df_index = pd.read_csv(dl.DATAPATH + 'index_data/' + 'sh000300.csv',usecols=['date', 'open','close','change'],index_col=['date']).sort_index(ascending=True)
+df_index.columns = ['CSI_300_' + col for col in df_index.columns]
+df_index.index = df_index.index.values.astype('datetime64')
+df_index
 
 # %%
-((index['change'] + 1).cumprod() - 1).plot()
+((df_index['CSI_300_change'] + 1).cumprod() - 1).plot()
 
 # %% [markdown]
 # #### Download factor data
@@ -86,8 +88,8 @@ with open('./Data/raw_data/stock_names.h5', 'rb') as fp:
 
 # %%
 # value factor
-value = ['pe_ratio_ttm','pcf_ratio_ttm', 'pcf_ratio_total_ttm','pb_ratio_ttm','book_to_market_ratio_ttm','dividend_yield_ttm', 'ps_ratio_ttm']
-dl.download_factor_data(stock_names, value, START_DATE,END_DATE)
+# value = ['pe_ratio_ttm','pcf_ratio_ttm', 'pcf_ratio_total_ttm','pb_ratio_ttm','book_to_market_ratio_ttm','dividend_yield_ttm', 'ps_ratio_ttm']
+# dl.download_factor_data(stock_names, value, START_DATE,END_DATE)
 
 # %% [markdown]
 # ### Data Preprocessing Part 1
@@ -131,16 +133,16 @@ stock_names
 # step 2
 # get the listed date
 listed_dates = {dl.normalize_code(result['code'][0]): result['date'].min() for result in results}
-listed_dates = pd.DataFrame(pd.Series(listed_dates), columns=['listed_date']).sort_index()
+listed_dates = pd.DataFrame(pd.Series(listed_dates), columns=['listed_date']).sort_index().astype('datetime64')
 # left join with dataframe 'listed_dates'
 df_backtest = df_backtest.merge(listed_dates, left_on = 'stock', right_index=True, how='left')
 # create a new variable called 'is_listed' to check if a certain stock is listed at that given date
-df_backtest['is_listed'] = (df_backtest.index.get_level_values(level=0) >= df_backtest['listed_date'])
+df_backtest['is_listed_for_one_year'] = (df_backtest.index.get_level_values(level=0).values - df_backtest['listed_date'].values >= pd.Timedelta('1y'))
 
 # %%
 # number of non-listed stocks along the time
-non_listed = df_backtest[df_backtest['is_listed'] == False]
-num_nonlisted_stock = non_listed.groupby(level=0).count()['is_listed']
+non_listed = df_backtest[~df_backtest['is_listed_for_one_year']]
+num_nonlisted_stock = non_listed.groupby(level=0).count()['is_listed_for_one_year']
 num_nonlisted_stock.plot.line()
 
 # %%
@@ -157,9 +159,8 @@ df_is_suspended = dl.load_suspended_data(stock_names)
 df_backtest['is_st'] = df_is_st.values
 df_backtest['is_suspended'] = df_is_suspended.values
 # filter out stocks that are listed within a year
-df_backtest = df_backtest[df_backtest['listed_date']<'2020-01-01']
 #filter out ST and suspended stocks, filter data by the stock's listed date
-df_backtest = df_backtest.loc[ (~df_backtest['is_st']) & (~df_backtest['is_suspended']) & (df_backtest['is_listed']), BASIC_INFO_COLS]
+df_backtest = df_backtest.loc[ (~df_backtest['is_st']) & (~df_backtest['is_suspended']) & (df_backtest['is_listed_for_one_year']), BASIC_INFO_COLS]
 #keep data only on the rebalancing dates
 rebalancing_dates = pd.date_range(start=START_DATE, end=END_DATE, freq='BM')
 df_backtest = df_backtest[df_backtest.index.get_level_values(0).isin(rebalancing_dates)]
@@ -176,14 +177,10 @@ df_backtest['next_period_return'] = (df_backtest['next_period_open'].values - df
 df_backtest = df_backtest[df_backtest.index.get_level_values(0) != df_backtest.index.get_level_values(0).max()]
 
 # %%
-df_preprocess1 = df_backtest
+df_preprocess1 = df_backtest.copy()
 
 # %%
 df_backtest
-
-# %%
-nan = df_backtest.loc['2020-11-30','688368.XSHG'][0]
-nan
 
 
 # %% [markdown]
@@ -194,17 +191,17 @@ nan
 #
 
 # %%
-def remove_outlier(df, n=3, nan=nan):
+def remove_outlier(df, n=3,):
     #for any factor, if the stock's factor exposure lies more than n times MAD away from the factor's median, 
     # reset that stock's factor exposure to median + n * MAD/median - n* MAD
     med = df.median(axis=0)
     MAD = (df - med).abs().median()
     upper_limit = med + n * MAD
     lower_limit = med - n * MAD
-    print(f"lower_limit = {lower_limit}, upper_limit = {upper_limit}")
+    # print(f"lower_limit = {lower_limit}, upper_limit = {upper_limit}")
     #pd.DataFrame.where replaces data in the dataframe by 'other' where the condition is False
-    df = df.where((df <= upper_limit) | (df != nan) , other = upper_limit, axis=1)
-    df = df.where((df >= lower_limit) | (df != nan), other = lower_limit, axis=1)
+    df = df.where(~( ( df > upper_limit) & df.notnull() ), other = upper_limit, axis=1)
+    df = df.where(~( ( df < lower_limit) & df.notnull() ), other = lower_limit, axis=1)
     return df
 
 
@@ -241,7 +238,7 @@ df_preprocess1
 df_preprocess1 = df_preprocess1[df_preprocess1['next_period_return'].notnull() & df_preprocess1['market_value'].notnull()]
 
 # %%
-df_backtest = df_preprocess1
+df_backtest = df_preprocess1.copy()
 
 # %%
 df_preprocess1

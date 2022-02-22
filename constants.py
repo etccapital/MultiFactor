@@ -16,6 +16,9 @@ START_DATE = '20110101'
 END_DATE = '20201231'
 
 INDEX_COLS = ['date', 'stock']
+FACTORS = {
+    'value': ['pb_ratio_ttm', 'pe_ratio_ttm', 'pcf_ratio_ttmd']
+}
 TEST_FACTORS = ['PE_TTM', 'PS_TTM', 'PC_TTM', 'PB']
 BASIC_INFO_COLS = TEST_FACTORS + ['market_value', 'open', 'close']
 RQ_FACTORS = ['pb_ratio_ttm', 
