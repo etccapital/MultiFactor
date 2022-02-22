@@ -4,4 +4,3 @@ __pycache__/
 *.hdf
 *.csv
 *.h5
-*.ipynb
