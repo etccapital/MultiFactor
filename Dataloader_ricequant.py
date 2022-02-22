@@ -71,8 +71,8 @@ def normalize_code(symbol, pre_close=None):
 stock_names = [dl.normalize_code(csv_name.split(".")[0]) for csv_name in csv_names]
 
 def load_basic_info():
-    #parrallel computing speeds up the process x10 times
-    #returns a list containing many dataframes, each corresponding to a stock
+    # parrallel computing speeds up the process x10 times
+    # returns a list containing many dataframes, each corresponding to a stock
 
     def get_df(name):
         return pd.read_csv(stock_path+name)
@@ -83,7 +83,7 @@ def load_basic_info():
     return results
 
 def load_price_data(col='close'): 
-    #concatenate the price column from each csv
+    # concatenate the price column from each csv
     results = load_basic_info()
     price_data = pd.concat([result[col] for result in results], axis=1)
     stock_names = [dl.normalize_code(csv_name.split(".")[0]) for csv_name in csv_names]
@@ -125,7 +125,7 @@ def load_suspended_data(stock_names):
     """
     #if the dataframe is not stored in the local folder then we fetch it first
     if not os.path.exists('./Data/raw_data/is_suspended.h5'):
-        df_is_suspended = rq.is_suspended_stock(stock_names, START_DATE, END_DATE).stack()
+        df_is_suspended = rq.is_suspended(stock_names, START_DATE, END_DATE).stack()
         df_is_suspended.to_hdf('./Data/raw_data/is_suspended.h5', key='is_suspended')
     #load the dataframe
     df_is_suspended = pd.read_hdf('./Data/raw_data/is_suspended.h5', key='is_suspended')
@@ -154,7 +154,8 @@ def load_factor_data(factor: str) -> pd.DataFrame:
     return factor_data
 
 def download_factor_data(stock_names: np.array, factor_name: str, startdate: str, enddate: str) -> None:
-    if not os.path.exists(f"./Data/factor/{factor_name}.h5"):
-        factor_frame = rq.get_factor(stock_names, factor_name, startdate, enddate)
-        factor_frame.to_hdf(DATAPATH + f'factor/{factor_name}.h5', key='factor')
+    for stock in stock_names:
+        if not os.path.exists(f"./Data/factor/{factor_name}.h5"):
+            factor_frame = rq.get_factor(stock_names, factor_name, startdate, enddate)
+            factor_frame.to_hdf(DATAPATH + f'factor/{factor_name}.h5', key='factor')
 
