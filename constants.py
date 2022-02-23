@@ -17,10 +17,10 @@ END_DATE = '20201231'
 
 INDEX_COLS = ['date', 'stock']
 FACTORS = {
-    'value': ['pb_ratio_ttm', 'pe_ratio_ttm', 'pcf_ratio_ttmd']
+    'value': ['pb_ratio_ttm', 'pe_ratio_ttm', 'pcf_ratio_ttm']
 }
-TEST_FACTORS = ['PE_TTM', 'PS_TTM', 'PC_TTM', 'PB']
-BASIC_INFO_COLS = TEST_FACTORS + ['market_value', 'open', 'close']
+TEST_FACTORS = ['PE_TTM', 'PS_TTM', 'PC_TTM', 'PB'] + FACTORS['value']
+BASIC_INFO_COLS = ['market_value', 'open', 'close']
 RQ_FACTORS = ['pb_ratio_ttm', 
                 'return_on_equity_ttm', 
                 'market_cap_3', 
