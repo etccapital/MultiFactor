@@ -1,5 +1,6 @@
 import Dataloader_ricequant as dl
 import os
+import pandas as pd
 
 DATAPATH = './data/' #seperating raw and processed data
 stock_path = DATAPATH + 'stock_data/'
@@ -14,16 +15,10 @@ industry_codes = [f'A0{i}' for i in range(1, 6)] + [f'B0{i}' for i in range(6, 1
 #backtesting timeframe
 START_DATE = '20110101'
 END_DATE = '20201231'
+rebalancing_dates = pd.date_range(start=START_DATE, end=END_DATE, freq='BM')
 
 INDEX_COLS = ['date', 'stock']
 FACTORS = {
     'value': ['pb_ratio_ttm', 'pe_ratio_ttm', 'pcf_ratio_ttm']
 }
-TEST_FACTORS = ['PE_TTM', 'PS_TTM', 'PC_TTM', 'PB'] + FACTORS['value']
 BASIC_INFO_COLS = ['market_value', 'open', 'close']
-RQ_FACTORS = ['pb_ratio_ttm', 
-                'return_on_equity_ttm', 
-                'market_cap_3', 
-                'dividend_yield_ttm', 
-                'book_to_market_ratio_ttm', 
-                'VOL3']

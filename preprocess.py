@@ -54,7 +54,6 @@ def time_and_list_status_preprocess(original_df: pd.DataFrame) -> pd.DataFrame:
     df_backtest = df_backtest.loc[ (~df_backtest['is_st']) & (~df_backtest['is_suspended']) & (df_backtest['is_listed_for_one_year']), BASIC_INFO_COLS]
 
     # keep data only on the rebalancing dates
-    rebalancing_dates = pd.date_range(start=START_DATE, end=END_DATE, freq='BM')
     df_backtest = df_backtest[df_backtest.index.get_level_values(0).isin(rebalancing_dates)]
 
     # the current rebalancing date is the last trading day of the current period
@@ -67,7 +66,7 @@ def time_and_list_status_preprocess(original_df: pd.DataFrame) -> pd.DataFrame:
     assert(df_backtest is not None)
     return df_backtest
 
-def standardization_and_outlier_missing_val_preprocess(df):
+def standardization_and_outlier_missing_val_preprocess(df, factors=TEST_FACTORS):
     """
     This function filters dataframe with the following steps
 
@@ -78,13 +77,13 @@ def standardization_and_outlier_missing_val_preprocess(df):
     """
 
     # step 1
-    df[TEST_FACTORS] = applyParallel(df[TEST_FACTORS].groupby(level=0), remove_outlier).values
+    df[factors] = applyParallel(df[factors].groupby(level=0), remove_outlier).values
 
     # step 2
-    df[TEST_FACTORS] = applyParallel(df[TEST_FACTORS].groupby(level=0), standardize).values
+    df[factors] = applyParallel(df[factors].groupby(level=0), standardize).values
 
     # step 3
-    df[TEST_FACTORS] = df[TEST_FACTORS].fillna(0).values
+    df[factors] = df[factors].fillna(0).values
 
     # step 4 
     df = df[df['next_period_return'].notnull() & df['market_value'].notnull()]
