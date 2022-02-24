@@ -59,18 +59,19 @@ However, version control will be impossible if we directly push them to the repo
 ├── data/
 │   ├── price
 │   └── factor
-├── Alphalens_single_factor_testing.py
-├── Alphalens_new.py
-├── data_download.py
-├── single_factor_analysis.py
-├── utils.py
-├── preprocess.py
-├── constants.py
-├── dataloader_ricequant.py
+├── src/
+│   ├── utils.py
+│   ├── preprocess.py
+│   ├── constants.py
+│   └── dataloader.py
+├── notebook
+├── scripted_notebook/
+│   ├── Alphalens_single_factor_testing.py
+│   ├── Alphalens_new.py
+│   ├── data_download.py
+│   ├── single_factor_analysis.py
+│   └── factor_combination.py
 ├── makefile_win.bat
 ├── environment.yml
 ├── README.md
 └── rq_credential.json (Not commited to repo)
-```
-
-Project structure generated with https://tree.nathanfriend.io/
