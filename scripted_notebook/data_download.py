@@ -13,8 +13,11 @@
 # ---
 
 # %%
-import Dataloader_ricequant as dl
-from constants import *
+import os 
+os.chdir('../')
+
+import src.dataloader as dl
+from src.constants import *
 
 # %%
 # Fill in the factor to be downloaded

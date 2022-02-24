@@ -17,11 +17,14 @@
 # Run this section before anything else
 
 # %%
+import os 
+os.chdir('../')
+
 from datetime import datetime, timedelta
-import Dataloader_ricequant as dl
+import src.dataloader as dl
 import pandas as pd
 import rqdatac as rq
-from constants import *
+from src.constants import *
 import scipy
 import statsmodels as sm
 import numpy as np

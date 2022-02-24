@@ -4,9 +4,7 @@ import pandas as pd
 import os
 import json
 import pathos
-from constants import *
-
-#TODO: Refactor this into a class if needed in the future
+from src.constants import *
 
 # Use rq_crendential.json to fill out Ricequant credentials
 # WARNING: MAKE SURE rq_crendential.json ARE NOT COMMITTED TO GITHUB
@@ -158,4 +156,5 @@ def download_factor_data(stock_names: np.array, factor_name: str, startdate: str
         if not os.path.exists(f"./Data/factor/{factor_name}.h5"):
             factor_frame = rq.get_factor(stock_names, factor_name, startdate, enddate)
             factor_frame.to_hdf(DATAPATH + f'factor/{factor_name}.h5', key='factor')
+
 

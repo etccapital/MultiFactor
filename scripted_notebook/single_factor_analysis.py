@@ -17,42 +17,32 @@
 # Run this section before anything else
 
 # %%
+import os 
+os.chdir('../')
+
 from datetime import datetime, timedelta
-import Dataloader_ricequant as dl
+import src.dataloader as dl
 import pandas as pd
 import rqdatac as rq
-from constants import *
-import scipy
+from src.constants import *
+from src.utils import *
+from src.preprocess import *
+
+# import scipyxf
 import statsmodels as sm
 import numpy as np
+import scipy
 import seaborn as sns
-import pathos
 from tqdm.notebook import tqdm
 import multiprocessing
 import pickle
 import matplotlib.pyplot as plt
 
-
 # %%
-def applyParallel(dfGrouped, func):
-    #parrallel computing version of pd.groupby.apply, works most of the time but not always
-    #I mainly use it for cases where func takes in a dataframe and outputs a dataframe or a series
-    with pathos.multiprocessing.ProcessPool(pathos.helpers.cpu_count()) as pool:
-        ret_list = pool.map(func, [group for name, group in dfGrouped])
-    return pd.concat(ret_list)
-
+TEST_FACTORS = []
 
 # %%
 dl.rq_initialize()
-
-
-# %%
-def sort_index_and_col(df) -> pd.DataFrame:
-    #sort the dataframe by index and column
-    return df.sort_index(axis=0).reindex(sorted(df.columns), axis=1)
-    #the following might achieve the same result in a cleaner way
-    # return df.sort_index(axis=0).sort_index(axis=1)
-
 
 # %%
 results = dl.load_basic_info()
@@ -80,24 +70,13 @@ df_index
 ((df_index['CSI_300_change'] + 1).cumprod() - 1).plot()
 
 # %% [markdown]
-# #### Download factor data
-
-# %%
-with open('./Data/raw_data/stock_names.h5', 'rb') as fp:
-     stock_names = pickle.load(fp)
-
-# %%
-# value factor
-# value = ['pe_ratio_ttm','pcf_ratio_ttm', 'pcf_ratio_total_ttm','pb_ratio_ttm','book_to_market_ratio_ttm','dividend_yield_ttm', 'ps_ratio_ttm']
-# dl.download_factor_data(stock_names, value, START_DATE,END_DATE)
-
-# %% [markdown]
 # ### Data Preprocessing Part 1
-
-# %% [markdown]
-# Major Steps: 
+#
+# Steps: 
 #
 # 0) Read all csv's and concatenate the desired column from each dataframe
+#
+# - 读取及合并dataframe
 #
 # 1) Filter out data before START_DATE and after END_DATE(backtesting period) from the raw stock data. 
 #
@@ -112,142 +91,28 @@ with open('./Data/raw_data/stock_names.h5', 'rb') as fp:
 #
 
 # %%
-# step 0
-df_backtest = pd.concat(results, axis=0).rename(columns={'code': 'stock'}).loc[:, INDEX_COLS + BASIC_INFO_COLS]
-df_backtest['date'] = pd.to_datetime(df_backtest['date'])
-
-# step 1
-df_backtest = df_backtest[ (START_DATE <= df_backtest['date']) & (df_backtest['date'] <= END_DATE) ]
-df_backtest['stock'] = df_backtest['stock'].apply(lambda stock: dl.normalize_code(stock))
-
-# have a (date_stock) multi-index dataframe 
-df_backtest = df_backtest.set_index(INDEX_COLS).sort_index()
-df_backtest = df_backtest.unstack(level=1).stack(dropna=False)
-
-
-# %%
-def get_factor_df(factor):
-    print(factor)
-    factor_path = os.path.join(DATAPATH, 'factor', factor + ".h5")
-    return pd.read_hdf(factor_path)
-
-for factor in FACTORS['value']:
-    df_backtest[factor] = get_factor_df(factor).sort_index().values
-# with pathos.multiprocessing.ProcessPool(pathos.helpers.cpu_count()) as pool:
-#     factor_results = pool.map(get_factor_df, FACTORS['value'])
-#     df_factor = pd.concat(factor_results, axis=1)
-
-# %%
-# check stock index
-stock_names = df_backtest.index.get_level_values(1).unique()
-stock_names
-
-# %%
-# step 2
-# get the listed date
-listed_dates = {dl.normalize_code(result['code'][0]): result['date'].min() for result in results}
-listed_dates = pd.DataFrame(pd.Series(listed_dates), columns=['listed_date']).sort_index().astype('datetime64')
-# left join with dataframe 'listed_dates'
-df_backtest = df_backtest.merge(listed_dates, left_on = 'stock', right_index=True, how='left')
-# create a new variable called 'is_listed' to check if a certain stock is listed at that given date
-df_backtest['is_listed_for_one_year'] = (df_backtest.index.get_level_values(level=0).values - df_backtest['listed_date'].values >= pd.Timedelta('1y'))
-
-# %%
-# number of non-listed stocks along the time
-non_listed = df_backtest[~df_backtest['is_listed_for_one_year']]
-num_nonlisted_stock = non_listed.groupby(level=0).count()['is_listed_for_one_year']
-num_nonlisted_stock.plot.line()
-
-# %%
-df_backtest
-
-# %%
-# load st/suspend data from Ricequant
-df_is_st = dl.load_st_data(stock_names)
-df_is_suspended = dl.load_suspended_data(stock_names)
-
-# %%
-# step 3
-#create ST and suspended columns
-df_backtest['is_st'] = df_is_st.values
-df_backtest['is_suspended'] = df_is_suspended.values
-# filter out stocks that are listed within a year
-#filter out ST and suspended stocks, filter data by the stock's listed date
-df_backtest = df_backtest.loc[ (~df_backtest['is_st']) & (~df_backtest['is_suspended']) & (df_backtest['is_listed_for_one_year']), BASIC_INFO_COLS + TEST_FACTORS]
-#keep data only on the rebalancing dates
-rebalancing_dates = pd.date_range(start=START_DATE, end=END_DATE, freq='BM')
-df_backtest = df_backtest[df_backtest.index.get_level_values(0).isin(rebalancing_dates)]
-
-# %%
-# the current rebalancing date is the last trading day of the current period
-# 'next_period_open' is defined as the stock's open price on the next relancing date
-# 'next_period_return' is the generated return by holding a stock from EOD of current rebalancing date to the start of the next rebalancing date
-df_backtest['next_period_open'] = df_backtest['open'].groupby(level=1).shift(-1).values
-df_backtest['next_period_return'] = (df_backtest['next_period_open'].values - df_backtest['close'].values) / df_backtest['close'].values
-df_backtest = df_backtest[df_backtest.index.get_level_values(0) != df_backtest.index.get_level_values(0).max()]
-
-# %%
-df_preprocess1 = df_backtest.copy()
-
-# %%
-df_backtest
-
+df_backtest = time_and_list_status_preprocess(results).copy()
 
 # %% [markdown]
-# ## Data Preprocessing part 2
-# ### 1) Replace Outliers with the corresponding threshold
-# ### 2) Standardization - Subtract mean and divide by std
-# ### 3) Fill missing values with 0
+# ### Data Preprocessing part 2
+#
+# Steps:
+#
+# 1) Replace Outliers with the corresponding threshold
+#
+# 2) Standardization - Subtract mean and divide by std
+#
+# 3) Fill missing factor values with 0
+#
+# 4) Filter out entries with missing return values
 #
 
 # %%
-def remove_outlier(df, n=3,):
-    #for any factor, if the stock's factor exposure lies more than n times MAD away from the factor's median, 
-    # reset that stock's factor exposure to median + n * MAD/median - n* MAD
-    med = df.median(axis=0)
-    MAD = (df - med).abs().median()
-    upper_limit = med + n * MAD
-    lower_limit = med - n * MAD
-    # print(f"lower_limit = {lower_limit}, upper_limit = {upper_limit}")
-    #pd.DataFrame.where replaces data in the dataframe by 'other' where the condition is False
-    df = df.where(~( ( df > upper_limit) & df.notnull() ), other = upper_limit, axis=1)
-    df = df.where(~( ( df < lower_limit) & df.notnull() ), other = lower_limit, axis=1)
-    return df
-
+# what is this step used for? Check the number of rebalancing dates?
+df_backtest.groupby(level=0)[TEST_FACTORS].agg('sum')
 
 # %%
-# step 1
-df_preprocess1[TEST_FACTORS] = applyParallel(df_preprocess1[TEST_FACTORS].groupby(level=0), remove_outlier).values
-
-# %%
-df_preprocess1
-
-
-# %%
-def standardize(df):
-    #on each rebalancing date, each standardized factor has mean 0 and std 1
-    return (df - df.mean()) / df.std()
-
-df_preprocess1[TEST_FACTORS] = applyParallel(df_preprocess1[TEST_FACTORS].groupby(level=0), standardize).values
-
-# %%
-df_preprocess1.groupby(level=0)[TEST_FACTORS].agg(['mean', 'std'])
-
-# %%
-df_preprocess1[TEST_FACTORS] = df_preprocess1[TEST_FACTORS].fillna(0).values
-
-# %%
-df_preprocess1
-
-# %%
-#data missing issue, simply filter them out, otherwise would negatively impact later results
-df_preprocess1 = df_preprocess1[df_preprocess1['next_period_return'].notnull() & df_preprocess1['market_value'].notnull()]
-
-# %%
-df_backtest = df_preprocess1.copy()
-
-# %%
-df_preprocess1
+df_backtest = standardization_and_outlier_missing_val_preprocess(df_backtest).copy()
 
 # %% [markdown]
 # # Single-Factor Backtesting
@@ -409,8 +274,7 @@ plt.ylabel("Number of Companies")
 plt.show()
 
 # %%
-#Here for simplicity we assume that index weight is a uniform portfolio over all stocks
-#TODO: use the real index constituent weights instead
+#Here for simplicity we assume that index weight is a uniform portfolio over all stocks, to be modified later
 df_backtest['index_weight'] = df_backtest.groupby(level=0).apply(lambda df: pd.Series([1/df.shape[0]] * df.shape[0])).values
 
 
@@ -523,11 +387,7 @@ group_cum_returns.plot()
 # ## Factor Combination
 
 # %%
-df_backtest.columns
-
-# %%
-# COMBINE_FACTORS = ['PE_TTM', 'PS_TTM', 'PC_TTM']
-COMBINE_FACTORS = ['pb_ratio_ttm', 'pe_ratio_ttm', 'pcf_ratio_ttm']
+COMBINE_FACTORS = ['PE_TTM', 'PS_TTM']
 
 
 # %%
@@ -564,8 +424,7 @@ df_ic_series
 
 # %%
 hist_periods = 12
-df_ic_hist_mean = df_ic_series.rolling(hist_periods, min_periods=1).mean().iloc[hist_periods:]
-df_ic_hist_mean
+df_ic_series.rolling(hist_periods, min_periods=hist_periods).mean()
 
 # %%
 #leave the computation for later
@@ -574,28 +433,38 @@ df_ic_hist_mean
 # np.expand_dims(A, 0)
 
 # %%
-df_ic_cov_mat_series = df_ic_series.rolling(hist_periods, min_periods=1).cov().iloc[hist_periods:]
+df_ic_cov_mat_series = df_ic_series.rolling(hist_periods, min_periods=hist_periods).cov()
 df_ic_cov_mat_series
 
 # %% [markdown]
 # #### maximize the ICIR values on a single rebalancing date
 
 # %%
+w = np.array([0.5, 0.5])
+
+# %%
+pd.date_range(START_DATE, END_DATE)
+
+# %%
 df_ic_hist_mean = df_ic_series.rolling(hist_periods, min_periods=hist_periods).mean()
 
 # %%
-date = '2011-01-31'
+df_ic_cov_mat_series = df_ic_series.rolling(hist_periods, min_periods=hist_periods).cov()
 
 # %%
-df_ic = df_ic_series[df_ic_series.index == date]
+df_ic = df_ic_series[df_ic_series.index == '2020-09-30']
 df_ic
 
 # %%
-df_ic_cov_mat = df_ic_cov_mat_series[df_ic_cov_mat_series.index.get_level_values(0) == date]
+df_ic_cov_mat = df_ic_cov_mat_series[df_ic_cov_mat_series.index.get_level_values(0) == '2020-09-30']
 df_ic_cov_mat
 
+# %%
+w @ df_ic_cov_mat.values @ w.transpose()
 
 # %%
+w.transpose() @ df_ic.values.flatten()
+
 
 # %%
 def get_ic_ir(factor_weights):
@@ -605,11 +474,10 @@ def get_ic_ir(factor_weights):
 
 
 # %%
-num_factors = len(COMBINE_FACTORS)
-uniform_weights = np.array([1 / num_factors] * num_factors)
-get_ic_ir(uniform_weights)
+df_ic_cov_mat.shape
 
 # %%
+num_factors = len(COMBINE_FACTORS)
 opt_result = scipy.optimize.minimize(
                 lambda w: -get_ic_ir(w),
                 np.array([1 / num_factors] * num_factors),
@@ -619,39 +487,10 @@ opt_result = scipy.optimize.minimize(
 opt_factor_weight = opt_result.x
 
 # %%
-
-# %%
 opt_factor_weight
-
-# %%
-get_ic_ir(opt_factor_weight)
 
 # %% [markdown]
 # #### optimal factor weight on all rebalancing dates
-
-# %%
-df_ic_series
-
-# %%
-opt_factor_weights = pd.DataFrame([], columns=COMBINE_FACTORS)
-for date in tqdm(df_ic_series.index):
-    print(date)
-    df_ic = df_ic_series[df_ic_series.index == date]
-    df_ic_cov_mat = df_ic_cov_mat_series[df_ic_cov_mat_series.index.get_level_values(0) == date]
-    num_factors = len(COMBINE_FACTORS)
-    uniform_weights = np.array([1 / num_factors] * num_factors)
-    print(f"ICIR with uniform weights: {get_ic_ir(uniform_weights)}")
-
-    opt_result = scipy.optimize.minimize(
-                    lambda w: -get_ic_ir(w),
-                    np.array([1 / num_factors] * num_factors),
-                    bounds=[(0, 1) for i in range(num_factors)],
-                    constraints=({"type": "eq", "fun": lambda weight: np.sum(weight) - 1})
-                )
-    opt_factor_weight = opt_result.x
-    opt_factor_weights.loc[date, :] = opt_factor_weight
-    print(f"ICIR with optimal weights: {get_ic_ir(opt_factor_weight)}")
-    get_ic_ir(opt_factor_weight)
 
 # %%
 df_ic_series.rolling(12).apply(lambda df: df.mean() )

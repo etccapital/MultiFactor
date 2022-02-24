@@ -5,11 +5,19 @@ if "%~1" == "setup" (
 )
 
 if "%~1" == "script_to_notebook" (
-    jupytext --to notebook --update data_download.py Alphalens_new.py Alphalens_single_factor_testing.py single_factor_analysis.py
+    move .\scripted_notebook\*.py .\
+    move .\notebook\*.ipynb .\
+    jupytext --to notebook --update *.py
+    move .\*.py .\scripted_notebook\
+    move .\*.ipynb .\notebook\
 )
 
 if "%~1" == "notebook_to_script" (
-    jupytext --to py:percent data_download.ipynb Alphalens_new.ipynb Alphalens_single_factor_testing.ipynb single_factor_analysis.ipynb
+    move .\scripted_notebook\*.py .\
+    move .\notebook\*.ipynb .\
+    jupytext --to py:percent *.ipynb
+    move .\*.py .\scripted_notebook\
+    move .\*.ipynb .\notebook\
 )
 
 pause

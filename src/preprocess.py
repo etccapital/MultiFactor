@@ -1,5 +1,5 @@
-from constants import *
-from utils import *
+from src.constants import *
+from src.utils import *
 import pandas as pd
 
 def time_and_list_status_preprocess(original_df: pd.DataFrame) -> pd.DataFrame:
@@ -66,7 +66,7 @@ def time_and_list_status_preprocess(original_df: pd.DataFrame) -> pd.DataFrame:
     assert(df_backtest is not None)
     return df_backtest
 
-def standardization_and_outlier_missing_val_preprocess(df, factors=TEST_FACTORS):
+def standardization_and_outlier_missing_val_preprocess(df, factors):
     """
     This function filters dataframe with the following steps
 
@@ -75,6 +75,8 @@ def standardization_and_outlier_missing_val_preprocess(df, factors=TEST_FACTORS)
     step 3: Fill missing factor values with 0
     step 4: Filter out entries with missing return values
     """
+
+    assert(factors is not None)
 
     # step 1
     df[factors] = applyParallel(df[factors].groupby(level=0), remove_outlier).values

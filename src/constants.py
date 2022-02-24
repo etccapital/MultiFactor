@@ -1,4 +1,4 @@
-import Dataloader_ricequant as dl
+import src.dataloader as dl
 import os
 import pandas as pd
 
