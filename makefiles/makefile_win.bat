@@ -5,6 +5,7 @@ if "%~1" == "setup" (
 )
 
 if "%~1" == "script_to_notebook" (
+    cd ..
     move .\scripted_notebook\*.py .\
     move .\notebook\*.ipynb .\
     jupytext --to notebook --update *.py
@@ -13,6 +14,7 @@ if "%~1" == "script_to_notebook" (
 )
 
 if "%~1" == "notebook_to_script" (
+    cd ..
     move .\scripted_notebook\*.py .\
     move .\notebook\*.ipynb .\
     jupytext --to py:percent *.ipynb
