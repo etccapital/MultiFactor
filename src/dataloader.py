@@ -66,27 +66,33 @@ def normalize_code(symbol, pre_close=None):
 
     return ret_normalize_code
 
-stock_names = [dl.normalize_code(csv_name.split(".")[0]) for csv_name in csv_names]
+stock_names = [normalize_code(csv_name.split(".")[0]) for csv_name in csv_names]
 
-def load_basic_info():
+def load_stock_info():
     # parrallel computing speeds up the process x10 times
     # returns a list containing many dataframes, each corresponding to a stock
-
     def get_df(name):
         return pd.read_csv(stock_path+name)
-        # return pd.read_csv(stock_path+name).set_index(['date'])
-
     with pathos.multiprocessing.ProcessPool(pathos.helpers.cpu_count()) as pool:
-        results = pool.map(get_df, csv_names)
-    return results
+        stock_info_list = pool.map(get_df, csv_names)
+    return stock_info_list
 
-def load_price_data(col='close'): 
-    # concatenate the price column from each csv
-    results = load_basic_info()
-    price_data = pd.concat([result[col] for result in results], axis=1)
-    stock_names = [dl.normalize_code(csv_name.split(".")[0]) for csv_name in csv_names]
-    price_data.columns = stock_names
-    return price_data
+def load_basic_info():
+    data_path = "./Data/raw_data/"
+    file_name = 'df_basic_info.h5'
+    if not os.path.exists(data_path + file_name):
+        stock_info_list = load_stock_info()
+        df_basic_info = pd.concat(stock_info_list, axis=0).rename(columns={'code': 'stock'})[INDEX_COLS + BASIC_INFO_COLS]
+        df_basic_info.to_hdf(data_path + file_name, key=file_name)
+    df_basic_info = pd.read_hdf(data_path + file_name, key=file_name)
+    return df_basic_info
+# def load_price_data(col='close'): 
+#     # concatenate the price column from each csv
+#     results = load_basic_info()
+#     price_data = pd.concat([result[col] for result in results], axis=1)
+#     stock_names = [dl.normalize_code(csv_name.split(".")[0]) for csv_name in csv_names]
+#     price_data.columns = stock_names
+#     return price_data
 
 def load_industry_mapping():
     if not os.path.exists("./Data/raw_data/industry_mapping.h5"):
@@ -102,43 +108,49 @@ def load_industry_mapping():
     df_indus_mapping = pd.read_hdf("./Data/raw_data/industry_mapping.h5", key='industry_mapping')
     return df_indus_mapping
 
-def load_st_data(stock_names) -> pd.DataFrame:
+def load_st_data(stock_names, dates) -> pd.DataFrame:
     """
     stock_names: an iterable of stock names
     returns: a multindex(date and stockname) dataframe indicating whether a stock is an ST stock on a given date
     """
+    name = 'is_st'
     #if the dataframe is not stored in the local folder then we fetch it first
     if not os.path.exists('./Data/raw_data/is_st.h5'):
         df_is_st = rq.is_st_stock(stock_names, START_DATE, END_DATE).stack()
-        df_is_st.to_hdf('./Data/raw_data/is_st.h5', key='is_st')
+        df_is_st.to_hdf('./Data/raw_data/is_st.h5', key=name)
     #load the dataframe
-    df_is_st = pd.read_hdf('./Data/raw_data/is_st.h5', key='is_st')
-    df_is_st = df_is_st[df_is_st.index.get_level_values(1).isin(stock_names)]
+    df_is_st = pd.read_hdf('./Data/raw_data/is_st.h5', key=name).rename(name)
+    # df_is_st = df_is_st[df_is_st.index.get_level_values(1).isin(stock_names) & df_is_st.index.get_level_values(0).isin(dates)]
     return df_is_st
 
-def load_suspended_data(stock_names):
+def load_suspended_data(stock_names, dates):
     """
     stock_names: an iterable of stock names
     returns: a multindex(date and stockname) dataframe indicating whether a stock is a suspended stock on a given date
     """
+    name = 'is_suspended'
     #if the dataframe is not stored in the local folder then we fetch it first
     if not os.path.exists('./Data/raw_data/is_suspended.h5'):
         df_is_suspended = rq.is_suspended(stock_names, START_DATE, END_DATE).stack()
-        df_is_suspended.to_hdf('./Data/raw_data/is_suspended.h5', key='is_suspended')
+        df_is_suspended.to_hdf('./Data/raw_data/is_suspended.h5', key=name)
     #load the dataframe
-    df_is_suspended = pd.read_hdf('./Data/raw_data/is_suspended.h5', key='is_suspended')
-    df_is_suspended = df_is_suspended[df_is_suspended.index.get_level_values(1).isin(stock_names)]
+    df_is_suspended = pd.read_hdf('./Data/raw_data/is_suspended.h5', key=name).rename(name)
+    df_is_suspended = df_is_suspended[df_is_suspended.index.get_level_values(1).isin(stock_names) & df_is_suspended.index.get_level_values(0).isin(dates)]
     return df_is_suspended
 
-def load_listed_dates():
+def load_listed_dates(selected_stock_names=None):
     #get the listed date for each stock
     #the listed date of a stock is the earliest date in the stock's csv under ./Data/stock_data
-    if not os.path.exists("./Data/raw_data/listed_dates"):
-        results = load_basic_info()
-        listed_dates = [result.index.min() for result in results]
-        listed_dates = pd.Series(dict(zip(stock_names, listed_dates)))
-        listed_dates.to_hdf("./Data/raw_data/listed_dates", key='listed_dates')
-    listed_dates = pd.read_hdf("./Data/raw_data/listed_dates", key='listed_dates')
+    data_path = "./Data/raw_data/"
+    file_name = "listed_dates.h5"
+    if not os.path.exists(data_path + file_name):
+        stock_info_list = load_stock_info()
+        listed_dates = {normalize_code(result['code'][0]): result['date'].min() for result in stock_info_list}
+        listed_dates = pd.DataFrame(pd.Series(listed_dates), columns=['listed_date']).sort_index().astype('datetime64')
+        listed_dates.to_hdf(data_path + file_name, key=file_name)
+    listed_dates = pd.read_hdf(data_path + file_name, key=file_name)
+    if selected_stock_names is not None:
+        listed_dates = listed_dates[listed_dates.index.isin(selected_stock_names)]
     return listed_dates
 
 def load_factor_data(factor: str) -> pd.DataFrame:
@@ -148,8 +160,15 @@ def load_factor_data(factor: str) -> pd.DataFrame:
         factor_data = pd.read_hdf(DATAPATH + f'factor/{factor}.h5')
     except:
         print(f'{factor}.h5 not found')
-            
     return factor_data
+
+def load_index_data(index_code='sh000300'):
+    # CSI 300 沪深300
+    df_index = pd.read_csv(DATAPATH + 'index_data/' + index_code + '.csv',usecols=['date', 'open','close','change'],index_col=['date']).sort_index(ascending=True)
+    df_index.columns = ['CSI_300_' + col for col in df_index.columns]
+    df_index.index = df_index.index.values.astype('datetime64')
+    ((df_index['CSI_300_change'] + 1).cumprod() - 1).plot()
+    return df_index
 
 def download_factor_data(stock_names: np.array, factor_name: str, startdate: str, enddate: str) -> None:
     for stock in stock_names:

@@ -17,12 +17,13 @@
 # Run this section before anything else
 
 # %%
-
 import os 
 os.chdir('../')
 
+# %%
 from datetime import datetime, timedelta
 import src.dataloader as dl
+from src import preprocess
 import pandas as pd
 import rqdatac as rq
 from src.constants import *
@@ -35,6 +36,7 @@ from tqdm.notebook import tqdm
 import multiprocessing
 import pickle
 import matplotlib.pyplot as plt
+from src.utils import *
 
 
 # %%
@@ -49,17 +51,14 @@ def applyParallel(dfGrouped, func):
 # %%
 dl.rq_initialize()
 
+# %% [markdown]
+# ### Rewrite the data getter code into class form
 
 # %%
-def sort_index_and_col(df) -> pd.DataFrame:
-    #sort the dataframe by index and column
-    return df.sort_index(axis=0).reindex(sorted(df.columns), axis=1)
-    #the following might achieve the same result in a cleaner way
-    # return df.sort_index(axis=0).sort_index(axis=1)
-
+df_basic_info = dl.load_basic_info()
 
 # %%
-results = dl.load_basic_info()
+df_listed_dates = dl.load_listed_dates()
 
 # %% [markdown]
 # #### Load Industry Data
@@ -74,127 +73,42 @@ df_indus_mapping = dl.load_industry_mapping()
 # Currently index data is assumed to be uniformly weighted among all stocks
 
 # %%
-# CSI 300 沪深300
-df_index = pd.read_csv(dl.DATAPATH + 'index_data/' + 'sh000300.csv',usecols=['date', 'open','close','change'],index_col=['date']).sort_index(ascending=True)
-df_index.columns = ['CSI_300_' + col for col in df_index.columns]
-df_index.index = df_index.index.values.astype('datetime64')
-df_index
-
-# %%
-((df_index['CSI_300_change'] + 1).cumprod() - 1).plot()
-
-# %% [markdown]
-# #### Download factor data
+df_index = dl.load_index_data()
 
 # %%
 with open('./Data/raw_data/stock_names.h5', 'rb') as fp:
      stock_names = pickle.load(fp)
 
-# %%
-# value factor
-# value = ['pe_ratio_ttm','pcf_ratio_ttm', 'pcf_ratio_total_ttm','pb_ratio_ttm','book_to_market_ratio_ttm','dividend_yield_ttm', 'ps_ratio_ttm']
-# dl.download_factor_data(stock_names, value, START_DATE,END_DATE)
-
 # %% [markdown]
-# ### Data Preprocessing Part 1
-
-# %% [markdown]
-# Major Steps: 
+#     1) Filter out data before START_DATE and after END_DATE(backtesting period) from the raw stock data. 
 #
-# 0) Read all csv's and concatenate the desired column from each dataframe
+#     - 剔除不在回测区间内的股票信息
 #
-# 1) Filter out data before START_DATE and after END_DATE(backtesting period) from the raw stock data. 
+#     2) Filter listed stocks
 #
-# - 剔除不在回测区间内的股票信息
+#     - 选出回测区间内每只股票上市的时间。这一步是为了步骤3，因为在每个选股日筛选ST或者停牌股的前提是股票在该选股日已上市。
 #
-# 2) Filter listed stocks
-#
-# - 选出回测区间内每只股票上市的时间。这一步是为了步骤3，因为在每个选股日筛选ST或者停牌股的前提是股票在该选股日已上市。
-#
-# 3) Filter out ST stocks, suspended stocks and stocks that are listed only within one year
-# - 剔除ST，停牌和次新股（上市未满一年的股票）
-#
+#     3) Filter out ST stocks, suspended stocks and stocks that are listed only within one year
+#     - 剔除ST，停牌和次新股（上市未满一年的股票）
 
 # %%
-# step 0
-df_backtest = pd.concat(results, axis=0).rename(columns={'code': 'stock'}).loc[:, INDEX_COLS + BASIC_INFO_COLS]
-df_backtest['date'] = pd.to_datetime(df_backtest['date'])
-
-# step 1
-df_backtest = df_backtest[ (START_DATE <= df_backtest['date']) & (df_backtest['date'] <= END_DATE) ]
-df_backtest['stock'] = df_backtest['stock'].apply(lambda stock: dl.normalize_code(stock))
-
-# have a (date_stock) multi-index dataframe 
-df_backtest = df_backtest.set_index(INDEX_COLS).sort_index()
-df_backtest = df_backtest.unstack(level=1).stack(dropna=False)
+filter = preprocess.TimeAndStockFilter(df_basic_info)
+df_backtest = filter.run()
 
 
 # %%
-def get_factor_df(factor):
-    print(factor)
-    factor_path = os.path.join(DATAPATH, 'factor', factor + ".h5")
-    return pd.read_hdf(factor_path)
+def add_factors(df_backtest, factors: dict):
+    
 
-for factor in FACTORS['value']:
-    df_backtest[factor] = get_factor_df(factor).sort_index().values
-# with pathos.multiprocessing.ProcessPool(pathos.helpers.cpu_count()) as pool:
-#     factor_results = pool.map(get_factor_df, FACTORS['value'])
-#     df_factor = pd.concat(factor_results, axis=1)
 
 # %%
-# check stock index
-stock_names = df_backtest.index.get_level_values(1).unique()
-stock_names
-
-# %%
-# step 2
-# get the listed date
-listed_dates = {dl.normalize_code(result['code'][0]): result['date'].min() for result in results}
-listed_dates = pd.DataFrame(pd.Series(listed_dates), columns=['listed_date']).sort_index().astype('datetime64')
-# left join with dataframe 'listed_dates'
-df_backtest = df_backtest.merge(listed_dates, left_on = 'stock', right_index=True, how='left')
-# create a new variable called 'is_listed' to check if a certain stock is listed at that given date
-df_backtest['is_listed_for_one_year'] = (df_backtest.index.get_level_values(level=0).values - df_backtest['listed_date'].values >= pd.Timedelta('1y'))
-
-# %%
-# number of non-listed stocks along the time
-non_listed = df_backtest[~df_backtest['is_listed_for_one_year']]
-num_nonlisted_stock = non_listed.groupby(level=0).count()['is_listed_for_one_year']
-num_nonlisted_stock.plot.line()
+add_factors(df_backtest, {'value': ['pe_ratio_ttm', 'pb_ratio_ttm', 'pcf_ratio_ttm', 'peg_ratio_ttm', 'ev_ttm'], })
 
 # %%
 df_backtest
 
 # %%
-# load st/suspend data from Ricequant
-df_is_st = dl.load_st_data(stock_names)
-df_is_suspended = dl.load_suspended_data(stock_names)
-
-# %%
-# step 3
-#create ST and suspended columns
-df_backtest['is_st'] = df_is_st.values
-df_backtest['is_suspended'] = df_is_suspended.values
-# filter out stocks that are listed within a year
-#filter out ST and suspended stocks, filter data by the stock's listed date
-df_backtest = df_backtest.loc[ (~df_backtest['is_st']) & (~df_backtest['is_suspended']) & (df_backtest['is_listed_for_one_year']), BASIC_INFO_COLS + TEST_FACTORS]
-#keep data only on the rebalancing dates
-rebalancing_dates = pd.date_range(start=START_DATE, end=END_DATE, freq='BM')
-df_backtest = df_backtest[df_backtest.index.get_level_values(0).isin(rebalancing_dates)]
-
-# %%
-# the current rebalancing date is the last trading day of the current period
-# 'next_period_open' is defined as the stock's open price on the next relancing date
-# 'next_period_return' is the generated return by holding a stock from EOD of current rebalancing date to the start of the next rebalancing date
-df_backtest['next_period_open'] = df_backtest['open'].groupby(level=1).shift(-1).values
-df_backtest['next_period_return'] = (df_backtest['next_period_open'].values - df_backtest['close'].values) / df_backtest['close'].values
-df_backtest = df_backtest[df_backtest.index.get_level_values(0) != df_backtest.index.get_level_values(0).max()]
-
-# %%
-df_preprocess1 = df_backtest.copy()
-
-# %%
-df_backtest
+preprocess.standardize(df_backtest)
 
 
 # %% [markdown]

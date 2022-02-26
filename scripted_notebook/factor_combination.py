@@ -16,15 +16,17 @@
 # #### Set up
 # Run this section before anything else
 
+
+# %%
 # %%
 import os 
 os.chdir('../')
+from src.constants import *
 
 from datetime import datetime, timedelta
 import src.dataloader as dl
 import pandas as pd
 import rqdatac as rq
-from src.constants import *
 import scipy
 import statsmodels as sm
 import numpy as np
