@@ -38,6 +38,11 @@ def remove_outlier(df, n=3):
     # pd.DataFrame.where replaces data in the dataframe by 'other' where the condition is False
     df = df.where(~( ( df > upper_limit) & df.notnull() ), other = upper_limit, axis=1)
     df = df.where(~( ( df < lower_limit) & df.notnull() ), other = lower_limit, axis=1)
+
+    #is_outlier is a boolean dataframe indicating if each entry is an outlier or not
+    is_outlier = (df > upper_limit) | (df < lower_limit)
+    #check that there are no more outliers
+    assert(is_outlier.sum().sum() == 0)
     return df
 
 def standardize(df):

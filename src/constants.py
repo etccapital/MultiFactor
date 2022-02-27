@@ -20,4 +20,4 @@ INDEX_COLS = ['date', 'stock']
 FACTORS = {
     'value': ['pb_ratio_ttm', 'pe_ratio_ttm', 'pcf_ratio_ttm']
 }
-BASIC_INFO_COLS = ['market_value', 'open', 'close']
+NECESSARY_COLS = ['market_value', 'open', 'close', 'next_period_return', 'secon_indus_code', 'pri_indus_code']

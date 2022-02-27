@@ -28,7 +28,7 @@ class TimeAndStockFilter:
         step 0: preprocess the dataframe into desired format
         """
         # turn the date column's data type from str to pd.datetime
-        self.df_backtest['date'] = pd.to_datetime(self.df_backtest['date'] )
+        self.df_backtest['date'] = pd.to_datetime(self.df_backtest['date'])
         # make the # of stocks equal on each date
         # self.df_backtest = self.df_backtest.unstack(level=1).stack(dropna=False)
 
@@ -87,7 +87,10 @@ class TimeAndStockFilter:
         self.df_backtest = self.df_backtest[self.df_backtest['date'] != self.df_backtest['date'].max()]
         # have a (date, stock) multi-index dataframe
         self.df_backtest = self.df_backtest.set_index(INDEX_COLS)
-        self.df_backtest = self.df_backtest[BASIC_INFO_COLS + ['next_period_return']]
+        # filter out unnecessary columns
+        self.df_backtest = self.df_backtest.loc[:, self.df_backtest.columns.isin(NECESSARY_COLS)]
+        #add primary and secondary industry codes to the dataframe
+        self.df_backtest = self.df_backtest.merge(dl.load_industry_mapping(), how='left', left_on='stock', right_index=True, )
 
     def run(self):
         self.preprocess()
@@ -98,7 +101,25 @@ class TimeAndStockFilter:
         return self.df_backtest
 
 @timer
-def standardize(df, factors):
+def add_factors(df_backtest, factors: dict):
+    #get factor data and merge it onto the original backtesting framework
+    #currently written in 
+    df_backtest = df_backtest.copy()
+    for type, factor_list in factors.items():
+        print(type)
+        for factor in factor_list:
+            print(factor)
+            if factor in df_backtest.columns: continue
+            data_path = os.path.join(DATAPATH, 'factor', type, factor + ".h5")
+            df_factor = pd.read_hdf(data_path)
+            df_factor = df_factor.reset_index().rename(columns={'order_book_id': 'stock'})
+            df_factor = df_factor[df_factor['date'].isin(rebalancing_dates)]
+            df_factor = df_factor.set_index(INDEX_COLS)
+            df_backtest = df_backtest.merge(df_factor, how='left', left_index=True, right_index=True)
+    return df_backtest
+
+@timer
+def standardize_factors(df, factors, remove_outlier_or_not=True, standardize_or_not=True, fill_na_or_not=True, filter_out_missing_values_or_not=True):
     """
     This function filters dataframe with the following steps
 
@@ -110,17 +131,37 @@ def standardize(df, factors):
 
     assert(factors is not None)
 
-    # step 1
-    df[factors] = applyParallel(df[factors].groupby(level=0), remove_outlier).values
+    df = df.copy()  
+
+    # step 1     
+    if remove_outlier_or_not == True:
+        df[factors] = applyParallel(df[factors].groupby(level=0), remove_outlier).values
 
     # step 2
-    df[factors] = applyParallel(df[factors].groupby(level=0), standardize).values
+    if standardize_or_not == True:
+        df[factors] = applyParallel(df[factors].groupby(level=0), standardize).values
+        
+        #is_mean_close_to_zero is a T x N matrix where T is the # of rebalancing dates and N is the # of factors
+        #each entry checks whether the mean of a given factor on a given rebalancing date is close to 0
+        is_mean_close_to_zero = (df.groupby(level=0)[factors].mean() - 0).abs() < 1e-10
+        # after standadrization, all factor exposures on any rebalancing date should have mean 0 
+        assert( is_mean_close_to_zero.all().all() )
+        #is_std_close_to_one is a T x N matrix where T is the # of rebalancing dates and N is the # of factors
+        #each entry checks whether the standard deivation of a given factor on a given rebalancing date is close to 1
+        is_std_close_to_one = (df.groupby(level=0)[factors].std() - 1).abs() < 1e-10
+        # after standadrization, all factor exposures on any rebalancing date should have std 1 
+        assert( is_std_close_to_one.all().all() )
 
     # step 3
-    df[factors] = df[factors].fillna(0).values
+    if fill_na_or_not == True:
+        df[factors] = df[factors].fillna(0).values
+        #there should be no nan values after filling them with 0
+        assert(df.isnull().sum().sum() == 0)
 
     # step 4 
-    df = df[df['next_period_return'].notnull() & df['market_value'].notnull()]
+    #data missing issue, simply filter them out, otherwise would negatively impact single factor testing results
+    if filter_out_missing_values_or_not == True:
+        df = df[df['next_period_return'].notnull() & df['market_value'].notnull()]
 
     assert(df is not None)
     return df
