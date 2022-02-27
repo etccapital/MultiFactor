@@ -41,7 +41,7 @@ class TimeAndStockFilter:
         self.df_backtest = self.df_backtest[self.df_backtest['date'].isin(rebalancing_dates)]
         # Filter out data before START_DATE and after END_DATE(backtesting period) from the raw stock data
         # self.df_backtest = self.df_backtest[ (start <= self.df_backtest['date']) & (self.df_backtest['date'] <= end) ]
-        self.df_backtest = self.df_backtest.sort_values(by=INDEX_COLS)
+        self.df_backtest = self.df_backtest.sort_values(by=INDEX_COLS, ascending=True)
         # normalize the stock codes
         self.df_backtest['stock'] = self.df_backtest['stock'].apply(dl.normalize_code)
 
@@ -85,6 +85,8 @@ class TimeAndStockFilter:
         self.df_backtest['next_period_return'] = (self.df_backtest.groupby('date')['open'].shift(-1).values - self.df_backtest['close'].values) / self.df_backtest['close'].values
         #drop the last period since its 'next_period_return' cannot be calculated
         self.df_backtest = self.df_backtest[self.df_backtest['date'] != self.df_backtest['date'].max()]
+        #sort the dataframe by date and stocks
+        self.df_backtest = self.df_backtest.sort_values(by=INDEX_COLS, ascending=True)
         # have a (date, stock) multi-index dataframe
         self.df_backtest = self.df_backtest.set_index(INDEX_COLS)
         # filter out unnecessary columns
@@ -155,8 +157,8 @@ def standardize_factors(df, factors, remove_outlier_or_not=True, standardize_or_
     # step 3
     if fill_na_or_not == True:
         df[factors] = df[factors].fillna(0).values
-        #there should be no nan values after filling them with 0
-        assert(df.isnull().sum().sum() == 0)
+        #there should be no nan factor values after filling them with 0
+        assert(df[factors].isnull().sum().sum() == 0)
 
     # step 4 
     #data missing issue, simply filter them out, otherwise would negatively impact single factor testing results
