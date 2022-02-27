@@ -38,33 +38,11 @@ import pickle
 import matplotlib.pyplot as plt
 from src.utils import *
 
-
-# %%
-def applyParallel(dfGrouped, func):
-    #parrallel computing version of pd.groupby.apply, works most of the time but not always
-    #I mainly use it for cases where func takes in a dataframe and outputs a dataframe or a series
-    with pathos.multiprocessing.ProcessPool(pathos.helpers.cpu_count()) as pool:
-        ret_list = pool.map(func, [group for name, group in dfGrouped])
-    return pd.concat(ret_list)
-
-
-# %%
-dl.rq_initialize()
-
 # %% [markdown]
 # ### Rewrite the data getter code into class form
 
 # %%
 df_basic_info = dl.load_basic_info()
-
-# %%
-df_listed_dates = dl.load_listed_dates()
-
-# %% [markdown]
-# #### Load Industry Data
-
-# %%
-df_indus_mapping = dl.load_industry_mapping()
 
 # %% [markdown]
 # #### Load Index Data
@@ -74,10 +52,6 @@ df_indus_mapping = dl.load_industry_mapping()
 
 # %%
 df_index = dl.load_index_data()
-
-# %%
-with open('./Data/raw_data/stock_names.h5', 'rb') as fp:
-     stock_names = pickle.load(fp)
 
 # %% [markdown]
 #     1) Filter out data before START_DATE and after END_DATE(backtesting period) from the raw stock data. 
@@ -95,77 +69,25 @@ with open('./Data/raw_data/stock_names.h5', 'rb') as fp:
 filter = preprocess.TimeAndStockFilter(df_basic_info)
 df_backtest = filter.run()
 
-
-# %%
-def add_factors(df_backtest, factors: dict):
-    
-
-
-# %%
-add_factors(df_backtest, {'value': ['pe_ratio_ttm', 'pb_ratio_ttm', 'pcf_ratio_ttm', 'peg_ratio_ttm', 'ev_ttm'], })
-
 # %%
 df_backtest
 
 # %%
-preprocess.standardize(df_backtest)
-
-
-# %% [markdown]
-# ## Data Preprocessing part 2
-# ### 1) Replace Outliers with the corresponding threshold
-# ### 2) Standardization - Subtract mean and divide by std
-# ### 3) Fill missing values with 0
-#
+df_backtest.to_hdf(os.path.join(DATAPATH, 'intermediary_data', 'df_preprocess1.h5'), key='df_preprocess1')
 
 # %%
-def remove_outlier(df, n=3,):
-    #for any factor, if the stock's factor exposure lies more than n times MAD away from the factor's median, 
-    # reset that stock's factor exposure to median + n * MAD/median - n* MAD
-    med = df.median(axis=0)
-    MAD = (df - med).abs().median()
-    upper_limit = med + n * MAD
-    lower_limit = med - n * MAD
-    # print(f"lower_limit = {lower_limit}, upper_limit = {upper_limit}")
-    #pd.DataFrame.where replaces data in the dataframe by 'other' where the condition is False
-    df = df.where(~( ( df > upper_limit) & df.notnull() ), other = upper_limit, axis=1)
-    df = df.where(~( ( df < lower_limit) & df.notnull() ), other = lower_limit, axis=1)
-    return df
-
+value_factors = ['pe_ratio_ttm', 'pb_ratio_ttm', 'pcf_ratio_ttm', 'peg_ratio_ttm', 'ev_ttm']
+all_factors = {'value': value_factors,
+              }
+df_backtest = preprocess.add_factors(df_backtest, all_factors)
 
 # %%
-# step 1
-df_preprocess1[TEST_FACTORS] = applyParallel(df_preprocess1[TEST_FACTORS].groupby(level=0), remove_outlier).values
+df_standardized = preprocess.standardize_factors(df_backtest, value_factors,)
 
 # %%
-df_preprocess1
-
-
-# %%
-def standardize(df):
-    #on each rebalancing date, each standardized factor has mean 0 and std 1
-    return (df - df.mean()) / df.std()
-
-df_preprocess1[TEST_FACTORS] = applyParallel(df_preprocess1[TEST_FACTORS].groupby(level=0), standardize).values
+df_standardized
 
 # %%
-df_preprocess1.groupby(level=0)[TEST_FACTORS].agg(['mean', 'std'])
-
-# %%
-df_preprocess1[TEST_FACTORS] = df_preprocess1[TEST_FACTORS].fillna(0).values
-
-# %%
-df_preprocess1
-
-# %%
-#data missing issue, simply filter them out, otherwise would negatively impact later results
-df_preprocess1 = df_preprocess1[df_preprocess1['next_period_return'].notnull() & df_preprocess1['market_value'].notnull()]
-
-# %%
-df_backtest = df_preprocess1.copy()
-
-# %%
-df_preprocess1
 
 # %% [markdown]
 # # Single-Factor Backtesting
@@ -179,12 +101,6 @@ df_preprocess1
 
 # %%
 SINGLE_FACTOR = 'PE_TTM'
-
-# %%
-df_backtest = df_backtest.merge(df_indus_mapping, how='left', left_on='stock', right_index=True)
-print(df_backtest.shape)
-df_backtest = df_backtest[df_backtest['pri_indus_code'].notnull()]
-print(df_backtest.shape)
 
 # %%
 df_backtest
@@ -514,8 +430,6 @@ df_ic_cov_mat
 
 
 # %%
-
-# %%
 def get_ic_ir(factor_weights):
     ic_mean = factor_weights.transpose() @ df_ic.values.flatten()
     ic_var = factor_weights @ df_ic_cov_mat.values @ factor_weights.transpose()
@@ -535,8 +449,6 @@ opt_result = scipy.optimize.minimize(
                 constraints=({"type": "eq", "fun": lambda weight: np.sum(weight) - 1})
             )
 opt_factor_weight = opt_result.x
-
-# %%
 
 # %%
 opt_factor_weight
