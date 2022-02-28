@@ -5,6 +5,7 @@ import os
 import json
 import pathos
 from src.constants import *
+from concurrent.futures import ThreadPoolExecutor
 
 # Use rq_crendential.json to fill out Ricequant credentials
 # WARNING: MAKE SURE rq_crendential.json ARE NOT COMMITTED TO GITHUB
@@ -69,20 +70,37 @@ def normalize_code(symbol, pre_close=None):
 stock_names = [normalize_code(csv_name.split(".")[0]) for csv_name in csv_names]
 
 def load_stock_info():
-    # parrallel computing speeds up the process x10 times
-    # returns a list containing many dataframes, each corresponding to a stock
+    """
+        Parrallel computing speeds up the process x10 times
+
+        Important lessons about parallel computing:
+        Here we use multiprocessing instead of multithreading since reading in data can be a CPU-bound task i.e. a computationally heavy one
+        as opposed to a I/O bound task i.e. tasks whose time are mainly spend on waiting for data to come in/go out.
+        Also, since 'get_df' is a local function, the multiprocessing module in the standard library cannot parallelly
+        execute it--it can only parallelly map objects which can be pickled/serialized, e.g. functions that are global.
+        Even writing 'get_df' and 'load_stock_info' into a single class does not resolve this issue.
+
+        But this can be solved using the pathos library.
+
+        I've tested this function in another notebook--it doesn't work somehow until I restarted vscode, after which it 
+        always worked fine. Not sure why this is the case but parallel computing produces weird errors sometimes.
+    Returns:
+        List[pd.DataFrame]: a list containing many dataframes, each corresponding to a stock
+    """
     def get_df(name):
         return pd.read_csv(stock_path+name)
     with pathos.multiprocessing.ProcessPool(pathos.helpers.cpu_count()) as pool:
         stock_info_list = pool.map(get_df, csv_names)
-    return stock_info_list
+    # with ThreadPoolExecutor() as executor:
+        # stock_info_list = executor.map(get_df, csv_names)
+    return list(stock_info_list)
 
 def load_basic_info():
     data_path = "./Data/raw_data/"
     file_name = 'df_basic_info.h5'
     if not os.path.exists(data_path + file_name):
-        stock_info_list = load_stock_info()
-        df_basic_info = pd.concat(stock_info_list, axis=0).rename(columns={'code': 'stock'})[INDEX_COLS + BASIC_INFO_COLS]
+        df_basic_info = pd.concat(load_stock_info(), axis=0).rename(columns={'code': 'stock'})
+        df_basic_info = df_basic_info.loc[:, df_basic_info.isin(INDEX_COLS + NECESSARY_COLS) ]
         df_basic_info.to_hdf(data_path + file_name, key=file_name)
     df_basic_info = pd.read_hdf(data_path + file_name, key=file_name)
     return df_basic_info
