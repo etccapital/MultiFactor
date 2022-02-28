@@ -57,25 +57,88 @@ However, version control will be impossible if we directly push them to the repo
 ---
 
 ## Project structure
-
+Use command `tree` in command line to generate the following folder structure. 
+Whenever you change the folder structure, please update the following diagram.
 ```
 .
-├── data/
-│   ├── price
-│   └── factor
-├── src/
-│   ├── utils.py
-│   ├── preprocess.py
-│   ├── constants.py
-│   └── dataloader.py
-├── notebook
-├── scripted_notebook/
-│   ├── Alphalens_single_factor_testing.py
-│   ├── Alphalens_new.py
-│   ├── data_download.py
-│   ├── single_factor_analysis.py
-│   └── factor_combination.py
-├── makefile_win.bat
-├── environment.yml
+├── Data
+│   ├── factor
+│   │   ├── cashflow
+│   │   │   ├── cash_flow_per_share_ttm.h5
+│   │   │   └── cash_flow_ratio_ttm.h5
+│   │   ├── dividend
+│   │   ├── financial_quality
+│   │   │   ├── debt_to_asset_ratio_ttm.h5
+│   │   │   ├── fixed_asset_ratio_ttm.h5
+│   │   │   └── return_on_equity_ttm.h5
+│   │   ├── growth
+│   │   │   └── inc_revenue_ttm.h5
+│   │   ├── momentum
+│   │   ├── size
+│   │   │   └── market_cap_3.h5
+│   │   ├── technical
+│   │   ├── value
+│   │   │   ├── book_to_market_ratio_ttm.h5
+│   │   │   ├── ev_ttm.h5
+│   │   │   ├── pb_ratio_ttm.h5
+│   │   │   ├── pcf_ratio_ttm.h5
+│   │   │   ├── pe_ratio_ttm.h5
+│   │   │   ├── peg_ratio_ttm.h5
+│   │   │   └── ps_ratio_ttm.h5
+│   │   └── volatility
+│   ├── index_data
+│   │   └── sh000300.csv
+│   ├── raw_data
+│   │   ├── df_basic_info.h5
+│   │   ├── industry_mapping.h5
+│   │   ├── is_st.h5
+│   │   ├── is_suspended.h5
+│   │   ├── listed_dates.h5
+│   │   └── stock_names.h5
+│   ├── stock_data
+│   │   ├── sh600000.csv
+│   │   ...
+│   │   └── sz301039.csv
 ├── README.md
-└── rq_credential.json (Not commited to repo)
+├── __pycache__
+│   ├── Dataloader_ricequant.cpython-37.pyc
+│   ├── constants.cpython-37.pyc
+│   ├── preprocess.cpython-37.pyc
+│   └── utils.cpython-37.pyc
+├── environment.yml
+├── makefiles
+│   ├── makefile_mac_notebook_to_py.sh
+│   ├── makefile_mac_py_to_notebook.sh
+│   └── makefile_win.bat
+├── not useful temporarily
+│   ├── Dataloader.py
+│   └── Ricequant API.ipynb
+├── notebook
+│   ├── Alphalens_new.ipynb
+│   ├── Alphalens_single_factor_testing.ipynb
+│   ├── data_download.ipynb
+│   ├── data_download_and_process.ipynb
+│   ├── factor_combination.ipynb
+│   └── single_factor_analysis.ipynb
+├── rq_credential.json
+├── scripted_notebook
+│   ├── Alphalens_new.py
+│   ├── Alphalens_single_factor_testing.py
+│   ├── data_download.py
+│   ├── data_download_and_process.py
+│   ├── factor_combination.py
+│   └── single_factor_analysis.py
+└── src
+    ├── __init__.py
+    ├── __pycache__
+    │   ├── __init__.cpython-37.pyc
+    │   ├── constants.cpython-37.pyc
+    │   ├── dataloader.cpython-37.pyc
+    │   ├── factor_combinator.cpython-37.pyc
+    │   ├── preprocess.cpython-37.pyc
+    │   └── utils.cpython-37.pyc
+    ├── constants.py
+    ├── dataloader.py
+    ├── factor_combinator.py
+    ├── preprocess.py
+    └── utils.py
