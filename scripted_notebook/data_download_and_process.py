@@ -37,6 +37,7 @@ import multiprocessing
 import pickle
 import matplotlib.pyplot as plt
 from src.utils import *
+from concurrent.futures import ThreadPoolExecutor
 
 # %% [markdown]
 # ### Rewrite the data getter code into class form
@@ -73,21 +74,116 @@ df_backtest = filter.run()
 df_backtest
 
 # %%
-df_backtest.to_hdf(os.path.join(DATAPATH, 'intermediary_data', 'df_preprocess1.h5'), key='df_preprocess1')
+# value_factors = ['pe_ratio_ttm', 'pb_ratio_ttm', 'pcf_ratio_ttm', 'peg_ratio_ttm', 'ev_ttm']
+# all_factors = {'value': value_factors,
+#               }
+# df_backtest = preprocess.add_factors(df_backtest, all_factors)
+
+# %%
+# df_standardized = preprocess.standardize_factors(df_backtest, value_factors,)
+# df_standardized
+
+# %%
+# class FactorDataGetter:
+#     # @timer
+#     # def __init__(self, df):
+#     #     self.df_backtest = df.copy()
+
+#     @timer
+#     def get_factor_data(file_path):
+#         # print(file_path)
+#         df_factor = pd.read_hdf(file_path)
+#         df_factor = df_factor.reset_index().rename(columns={'order_book_id': 'stock'})
+#         df_factor = df_factor[df_factor['date'].isin(rebalancing_dates)].set_index(INDEX_COLS).sort_index()
+#         return df_factor
+    
+#     @timer
+#     def add_factors(df_backtest: pd.DataFrame, factors: dict):
+#         """get factor data and merge it onto the original backtesting framework
+#         Args:
+#             df_backtest (pd.DataFrame): a pandas dataframe used for backtesting. It has multi-index (date, stock)
+#             factors (dict): a dictionary mapping factor types to factor lists
+#                             e.g. {'value': ['pe_ratio_ttm', 'pb_ratio_ttm', ],
+#                                     }
+#                             in order for factor data to be correctly read in,
+#                             pe_ratio_ttm.h5 and pb_ratio_ttm.h5 should exist under ./Data/factor/value/
+#         Returns:
+#             df_backtest: the updated backtesting dataframe
+#         """
+#         df_backtest = df_backtest.copy()
+#         def get_factor_path(type, factor):
+#             return os.path.join(DATAPATH, 'factor', type, factor + ".h5")
+#         all_factor_paths = [[get_factor_path(type, factor) for factor in factor_list] for type, factor_list in all_factors.items()]
+#         all_factor_paths = sum( all_factor_paths, [])
+#         print(all_factor_paths)
+
+#         with multiprocessing.Pool(multiprocessing.cpu_count()) as pool:
+#             factor_results = pool.map(FactorDataGetter.get_factor_data, all_factor_paths)  
+#         df_factor = pd.concat(factor_results, axis=1)  
+#         df_backtest = df_backtest.merge(df_factor, how='left', left_index=True, right_index=True)
+#         return df_backtest    
+
+
+# %%
+# FactorDataGetter.add_factors(df_backtest, all_factors)
 
 # %%
 value_factors = ['pe_ratio_ttm', 'pb_ratio_ttm', 'pcf_ratio_ttm', 'peg_ratio_ttm', 'ev_ttm']
 all_factors = {'value': value_factors,
               }
-df_backtest = preprocess.add_factors(df_backtest, all_factors)
+
 
 # %%
-df_standardized = preprocess.standardize_factors(df_backtest, value_factors,)
+@timer
+def add_factors(df_backtest: pd.DataFrame, factors: dict):
+    """get factor data and merge it onto the original backtesting framework
+    Args:
+        df_backtest (pd.DataFrame): a pandas dataframe used for backtesting. It has multi-index (date, stock)
+        factors (dict): a dictionary mapping factor types to factor lists
+                        e.g. {'value': ['pe_ratio_ttm', 'pb_ratio_ttm', ],
+                                }
+                        in order for factor data to be correctly read in,
+                        pe_ratio_ttm.h5 and pb_ratio_ttm.h5 should exist under ./Data/factor/value/
+    Returns:
+        df_backtest: the updated backtesting dataframe
+    """
+    df_backtest = df_backtest.copy()
+    def get_factor_path(type, factor):
+        return os.path.join(DATAPATH, 'factor', type, factor + ".h5")
+    all_factor_paths = [[get_factor_path(type, factor) for factor in factor_list] for type, factor_list in factors.items()]
+    all_factor_paths = sum( all_factor_paths, [])
+    # all_factor_paths = [path for path in all_factor_paths if path not in df_backtest.columns]
+    print(all_factor_paths)
+
+    @timer
+    def get_factor_data(file_path):
+        df_factor = pd.read_hdf(file_path)
+        df_factor = df_factor.reset_index().rename(columns={'order_book_id': 'stock'})
+        df_factor = df_factor[df_factor['date'].isin(rebalancing_dates)].set_index(INDEX_COLS).sort_index()
+        return df_factor
+
+    with pathos.multiprocessing.ProcessPool(pathos.helpers.cpu_count()) as pool:
+    # with ThreadPoolExecutor() as pool:
+        factor_results = pool.map(get_factor_data, all_factor_paths)
+    df_factor = pd.concat(factor_results, axis=1)  
+    df_backtest = df_backtest.merge(df_factor, how='left', left_index=True, right_index=True)
+    return df_backtest
+
 
 # %%
-df_standardized
+df_backtest = add_factors(df_backtest, all_factors)
 
 # %%
+df_backtest
+
+# %%
+# %reset_selective -f ^df_factor$
+
+# %%
+df1 = add_factors(df_backtest, all_factors)
+
+# %%
+df1
 
 # %% [markdown]
 # # Single-Factor Backtesting

@@ -123,7 +123,6 @@ def add_factors(df_backtest: pd.DataFrame, factors: dict):
     # all_factor_paths = [path for path in all_factor_paths if path not in df_backtest.columns]
     print(all_factor_paths)
 
-    @timer
     def get_factor_data(file_path):
         df_factor = pd.read_hdf(file_path)
         df_factor = df_factor.reset_index().rename(columns={'order_book_id': 'stock'})

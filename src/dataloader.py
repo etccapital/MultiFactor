@@ -82,6 +82,7 @@ def load_stock_info():
 
         But this can be solved using the pathos library.
 
+        If this function doesn't work for unknown reasons, try calling it for the second time, or restarting jupyter notebook.
         I've tested this function in another notebook--it doesn't work somehow until I restarted vscode, after which it 
         always worked fine. Not sure why this is the case but parallel computing produces weird errors sometimes.
     Returns:
@@ -96,6 +97,10 @@ def load_stock_info():
     return list(stock_info_list)
 
 def load_basic_info():
+    """
+    Returns:
+        pd.DataFrame: a dataframe containing the daily information of all stocks on all trading days
+    """
     data_path = "./Data/raw_data/"
     file_name = 'df_basic_info.h5'
     if not os.path.exists(data_path + file_name):
