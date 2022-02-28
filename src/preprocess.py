@@ -64,7 +64,7 @@ class TimeAndStockFilter:
         self.df_backtest = self.df_backtest.merge(df_is_suspended, how='left', left_on=INDEX_COLS, right_index=True)
         self.df_backtest = self.df_backtest.merge(df_listed_dates, how='left', left_on = 'stock', right_index=True)
         # create a new variable called 'is_listed_for_one_year' to check if a certain stock is listed for at least one year at that given date
-        self.df_backtest['is_listed_for_one_year'] = (self.df_backtest['date'] - self.df_backtest['listed_date'].values >= pd.Timedelta('1y'))
+        self.df_backtest['is_listed_for_one_year'] = (self.df_backtest['date'].values - self.df_backtest['listed_date'].values >= pd.Timedelta('1y'))
 
         # filter out stocks that are listed within a year, ST, and suspended stocks, filter data by the stock's listed date
         self.df_backtest = self.df_backtest.loc[ (~self.df_backtest['is_st']) & (~self.df_backtest['is_suspended']) & (self.df_backtest['is_listed_for_one_year']), :]
@@ -103,21 +103,38 @@ class TimeAndStockFilter:
         return self.df_backtest
 
 @timer
-def add_factors(df_backtest, factors: dict):
-    #get factor data and merge it onto the original backtesting framework
-    #currently written in 
+def add_factors(df_backtest: pd.DataFrame, factors: dict):
+    """get factor data and merge it onto the original backtesting framework
+    Args:
+        df_backtest (pd.DataFrame): a pandas dataframe used for backtesting. It has multi-index (date, stock)
+        factors (dict): a dictionary mapping factor types to factor lists
+                        e.g. {'value': ['pe_ratio_ttm', 'pb_ratio_ttm', ],
+                                }
+                        in order for factor data to be correctly read in,
+                        pe_ratio_ttm.h5 and pb_ratio_ttm.h5 should exist under ./Data/factor/value/
+    Returns:
+        df_backtest: the updated backtesting dataframe
+    """
     df_backtest = df_backtest.copy()
-    for type, factor_list in factors.items():
-        print(type)
-        for factor in factor_list:
-            print(factor)
-            if factor in df_backtest.columns: continue
-            data_path = os.path.join(DATAPATH, 'factor', type, factor + ".h5")
-            df_factor = pd.read_hdf(data_path)
-            df_factor = df_factor.reset_index().rename(columns={'order_book_id': 'stock'})
-            df_factor = df_factor[df_factor['date'].isin(rebalancing_dates)]
-            df_factor = df_factor.set_index(INDEX_COLS)
-            df_backtest = df_backtest.merge(df_factor, how='left', left_index=True, right_index=True)
+    def get_factor_path(type, factor):
+        return os.path.join(DATAPATH, 'factor', type, factor + ".h5")
+    all_factor_paths = [[get_factor_path(type, factor) for factor in factor_list] for type, factor_list in factors.items()]
+    all_factor_paths = sum( all_factor_paths, [])
+    # all_factor_paths = [path for path in all_factor_paths if path not in df_backtest.columns]
+    print(all_factor_paths)
+
+    @timer
+    def get_factor_data(file_path):
+        df_factor = pd.read_hdf(file_path)
+        df_factor = df_factor.reset_index().rename(columns={'order_book_id': 'stock'})
+        df_factor = df_factor[df_factor['date'].isin(rebalancing_dates)].set_index(INDEX_COLS).sort_index()
+        return df_factor
+
+    with pathos.multiprocessing.ProcessPool(pathos.helpers.cpu_count()) as pool:
+    # with ThreadPoolExecutor() as pool:
+        factor_results = pool.map(get_factor_data, all_factor_paths)
+    df_factor = pd.concat(factor_results, axis=1)  
+    df_backtest = df_backtest.merge(df_factor, how='left', left_index=True, right_index=True)
     return df_backtest
 
 @timer
