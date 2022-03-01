@@ -34,7 +34,7 @@ class TimeAndStockFilter:
         # self.df_backtest = self.df_backtest.unstack(level=1).stack(dropna=False)
 
     @timer
-    def filter_dates(self, rebalancing_dates=rebalancing_dates):
+    def filter_dates(self, rebalancing_dates=REBALANCING_DATES):
         """
         step 1: filter data on rebalancing dates. No need to filter using the backtesting start_date and end_date anymore because 
         """

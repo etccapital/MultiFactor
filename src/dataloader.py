@@ -119,6 +119,26 @@ def load_basic_info():
 #     price_data.columns = stock_names
 #     return price_data
 
+@timer
+def load_rebalancing_dates():
+    """The rebalancing dates are the last trading date in each month.
+    """
+    data_folder = os.path.join(DATAPATH, "raw_data")
+    file_name = 'rebalancing_dates'
+    data_path = os.path.join(data_folder, file_name + ".h5")    
+    if not os.path.exists(data_path):
+        #load the dataframe with basic information on all trading dates
+        df_basic_info = load_basic_info()
+        df_basic_info['date'] = pd.to_datetime(df_basic_info['date'])
+        df_basic_info['year'] = df_basic_info['date'].dt.year
+        df_basic_info['month'] = df_basic_info['date'].dt.month
+        df_basic_info['date'] = pd.to_datetime(df_basic_info['date'])
+        #groupby year and month first, then take the last date out of each group
+        rebalancing_dates = df_basic_info[(df_basic_info['date'] >= START_DATE) & (df_basic_info['date'] <= END_DATE)].groupby(['year', 'month'])['date'].max().values
+        pd.Series(rebalancing_dates).to_hdf(data_path, key=file_name)
+    rebalancing_dates = pd.to_datetime(pd.read_hdf(data_path).values)
+    return rebalancing_dates
+
 def load_industry_mapping():
     if not os.path.exists("./Data/raw_data/industry_mapping.h5"):
         # Extract industry mapping data from ricequant if it's not on the local computer.
@@ -144,6 +164,7 @@ def load_industry_mapping():
     df_indus_mapping = df_indus_mapping.merge(df_pri_indus_names, how='left', left_on='pri_indus_code', right_on='pri_indus_code' )
     df_indus_mapping = df_indus_mapping.merge(df_secon_indus_names, how='left', left_on='secon_indus_code', right_on='secon_indus_code' )
     df_indus_mapping = df_indus_mapping.set_index('stock')
+    # The full industry mapping dataframe should contain at least the following 6 columns
     assert(set(df_indus_mapping.columns).issuperset(
            set(['Primary Industry', 'Secondary Industry', '一级行业', '二级行业', 'pri_indus_code', 'secon_indus_code']) 
            )
