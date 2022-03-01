@@ -17,7 +17,5 @@ END_DATE = '20201231'
 rebalancing_dates = pd.date_range(start=START_DATE, end=END_DATE, freq='BM')
 
 INDEX_COLS = ['date', 'stock']
-FACTORS = {
-    'value': ['pb_ratio_ttm', 'pe_ratio_ttm', 'pcf_ratio_ttm']
-}
-NECESSARY_COLS = ['market_value', 'open', 'close', 'next_period_return', 'secon_indus_code', 'pri_indus_code']
+INDUSTRY_COLS = ['一级行业', '二级行业']
+NECESSARY_COLS = ['market_value', 'open', 'close', 'next_period_return', ] + INDUSTRY_COLS

@@ -3,6 +3,7 @@ from src.utils import *
 import pandas as pd
 import src.dataloader as dl
 import matplotlib.pyplot as plt
+import numpy as np
 
 class TimeAndStockFilter:
     """
@@ -92,7 +93,7 @@ class TimeAndStockFilter:
         # filter out unnecessary columns
         self.df_backtest = self.df_backtest.loc[:, self.df_backtest.columns.isin(NECESSARY_COLS)]
         #add primary and secondary industry codes to the dataframe
-        self.df_backtest = self.df_backtest.merge(dl.load_industry_mapping(), how='left', left_on='stock', right_index=True, )
+        self.df_backtest = self.df_backtest.merge(dl.load_industry_mapping()[INDUSTRY_COLS], how='left', left_on='stock', right_index=True, )
 
     def run(self):
         self.preprocess()
@@ -123,7 +124,7 @@ def add_factors(df_backtest: pd.DataFrame, factors: dict):
     # all_factor_paths = [path for path in all_factor_paths if path not in df_backtest.columns]
     print(all_factor_paths)
 
-    def get_factor_data(file_path):
+    def get_factor_data(file_path): #each call takes around 3 to 4 seconds
         df_factor = pd.read_hdf(file_path)
         df_factor = df_factor.reset_index().rename(columns={'order_book_id': 'stock'})
         df_factor = df_factor[df_factor['date'].isin(rebalancing_dates)].set_index(INDEX_COLS).sort_index()
@@ -132,7 +133,9 @@ def add_factors(df_backtest: pd.DataFrame, factors: dict):
     with pathos.multiprocessing.ProcessPool(pathos.helpers.cpu_count()) as pool:
     # with ThreadPoolExecutor() as pool:
         factor_results = pool.map(get_factor_data, all_factor_paths)
-    df_factor = pd.concat(factor_results, axis=1)  
+    df_factor = pd.concat(factor_results, axis=1)
+
+    df_factor = df_factor.replace([np.inf, -np.inf], np.nan)  
     df_backtest = df_backtest.merge(df_factor, how='left', left_index=True, right_index=True)
     return df_backtest
 

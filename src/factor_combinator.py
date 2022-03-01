@@ -60,7 +60,7 @@ class FactorCombinator:
         Args:
             df_factor_weights (pd.DataFrame): This dataframe gives the factor weights
                                               Its index should be a subset of the rebalancing dates in self.df_backtest
-                                              It must contain the weight columns in self.weight_cols
+                                              It must contain all columns in self.weight_cols
                                               The factor weights in each row should be non-negative and add up to 1.
         """
         #the factor weights must be non-negative
@@ -97,7 +97,7 @@ class FactorCombinatorUniform(FactorCombinator):
 
 class FactorCombinatorByIC(FactorCombinator):
     """Combines factor exposures according to the weights that maximizes IC value
-       See Huatai MultiFactor Report #10
+       See Huatai MultiFactor Report #10 华泰金工多因子系列研报-10
     """
     def __init__(self, hist_periods:int=12, *args, **kwargs):
 
@@ -155,7 +155,7 @@ class FactorCombinatorByIC(FactorCombinator):
         2. Solves a convex optimization problem to determine which set of factor weights gives the highest expected IC value
            for the combined factor. Here IC values are assumed to be linearly addable and scalable.
         Returns:
-            pd.DataFrame: This dataframe gives the optimal factor weights
+            pd.DataFrame: A dataframe giving the optimal factor weights
                             Its index should be a subset of the rebalancing dates in self.df_backtest
                             It must contain the weight columns in self.weight_cols
                             The factor weights in each row should be non-negative and add up to 1.

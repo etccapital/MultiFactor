@@ -96,17 +96,13 @@ Whenever you change the folder structure, please update the following diagram.
 │   │   ├── is_st.h5
 │   │   ├── is_suspended.h5
 │   │   ├── listed_dates.h5
-│   │   └── stock_names.h5
+│   │   ├── stock_names.h5
+│   │   └── industry_code_to_names.xlsx
 │   ├── stock_data
 │   │   ├── sh600000.csv
 │   │   ...
 │   │   └── sz301039.csv
 ├── README.md
-├── __pycache__
-│   ├── Dataloader_ricequant.cpython-37.pyc
-│   ├── constants.cpython-37.pyc
-│   ├── preprocess.cpython-37.pyc
-│   └── utils.cpython-37.pyc
 ├── environment.yml
 ├── makefiles
 │   ├── makefile_mac_notebook_to_py.sh
@@ -132,13 +128,6 @@ Whenever you change the folder structure, please update the following diagram.
 │   └── single_factor_analysis.py
 └── src
     ├── __init__.py
-    ├── __pycache__
-    │   ├── __init__.cpython-37.pyc
-    │   ├── constants.cpython-37.pyc
-    │   ├── dataloader.cpython-37.pyc
-    │   ├── factor_combinator.cpython-37.pyc
-    │   ├── preprocess.cpython-37.pyc
-    │   └── utils.cpython-37.pyc
     ├── constants.py
     ├── dataloader.py
     ├── factor_combinator.py

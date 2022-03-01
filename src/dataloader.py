@@ -6,6 +6,7 @@ import json
 import pathos
 from src.constants import *
 from concurrent.futures import ThreadPoolExecutor
+from src.utils import *
 
 # Use rq_crendential.json to fill out Ricequant credentials
 # WARNING: MAKE SURE rq_crendential.json ARE NOT COMMITTED TO GITHUB
@@ -96,6 +97,7 @@ def load_stock_info():
         # stock_info_list = executor.map(get_df, csv_names)
     return list(stock_info_list)
 
+@timer
 def load_basic_info():
     """
     Returns:
@@ -119,6 +121,9 @@ def load_basic_info():
 
 def load_industry_mapping():
     if not os.path.exists("./Data/raw_data/industry_mapping.h5"):
+        # Extract industry mapping data from ricequant if it's not on the local computer.
+        # Extracting from ricequant is quite time consuming. Alternaively, you can download the data from the 
+        # cloud folder
         indus_to_stock = {industry: rq.industry(industry) for industry in industry_codes}
         stock_to_indus = {}
         for indus, stock_names in indus_to_stock.items():
@@ -128,7 +133,30 @@ def load_industry_mapping():
         df_indus_mapping = pd.Series(stock_to_indus, name='secon_indus_code').to_frame()
         df_indus_mapping['pri_indus_code'] = df_indus_mapping['secon_indus_code'].str[0]
         df_indus_mapping.to_hdf("./Data/raw_data/industry_mapping.h5", key='industry_mapping')
-    df_indus_mapping = pd.read_hdf("./Data/raw_data/industry_mapping.h5", key='industry_mapping')
+
+    # Load the full industry mapping containing industry codes(A to S), industry names in Chinese, and industry names in English of each stock for both primary and secondary industries.
+    # The full industry mapping dataframe is obtained by first loading a main dataframe mapping stocks to their industry codes, and then merging the rest two dataframe, which maps industry codes to industry
+    # names, onto this dataframe.
+    # 'industry_code_to_names.xlsx' is artificially created based on information on https://www.ricequant.com/doc/rqdata/python/stock-mod.html#industry-获取某行业股票列表 
+    df_pri_indus_names = pd.read_excel(os.path.join(DATAPATH, 'raw_data', 'industry_code_to_names.xlsx'), 'Primary Industries')
+    df_secon_indus_names = pd.read_excel(os.path.join(DATAPATH, 'raw_data', 'industry_code_to_names.xlsx'), 'Secondary Industries')
+    df_indus_mapping = pd.read_hdf("./Data/raw_data/industry_mapping.h5", key='industry_mapping').reset_index().rename(columns={'index': 'stock'})
+    df_indus_mapping = df_indus_mapping.merge(df_pri_indus_names, how='left', left_on='pri_indus_code', right_on='pri_indus_code' )
+    df_indus_mapping = df_indus_mapping.merge(df_secon_indus_names, how='left', left_on='secon_indus_code', right_on='secon_indus_code' )
+    df_indus_mapping = df_indus_mapping.set_index('stock')
+    assert(set(df_indus_mapping.columns).issuperset(
+           set(['Primary Industry', 'Secondary Industry', '一级行业', '二级行业', 'pri_indus_code', 'secon_indus_code']) 
+           )
+    )
+    #depending on user input, choose which set of columns to use as industry names
+    # if form == 'english':
+    #     indus_cols = ['Primary Industry', 'Secondary Industry']
+    # elif form == '中文':
+    #     indus_cols = ['一级行业', '二级行业']
+    # elif form == 'code':
+    #     indus_cols = ['pri_indus_code', 'secon_indus_code']
+    # else:
+    #     raise Exception(f"'{form}' is not a valid input for form!")
     return df_indus_mapping
 
 def load_st_data(stock_names, dates) -> pd.DataFrame:
