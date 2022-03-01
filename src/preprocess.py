@@ -83,16 +83,18 @@ class TimeAndStockFilter:
         """
         # the rebalancing date is the last trading day of the period
         # 'next_period_return' is the generated return by holding a stock from end of current rebalancing date to the start of the next rebalancing date
-        self.df_backtest['next_period_return'] = (self.df_backtest.groupby('date')['open'].shift(-1).values - self.df_backtest['close'].values) / self.df_backtest['close'].values
-        #drop the last period since its 'next_period_return' cannot be calculated
+        #TODO: Some stocks, for example '600381.XSHG', is missing data from 2014 to 2015, so the calculation of 'next_period_return' is inaccurate for these stocks
+        #      Fix this later. 
+        self.df_backtest['next_period_return'] = (self.df_backtest.groupby('stock')['open'].shift(-1).values - self.df_backtest['close'].values) / self.df_backtest['close'].values
+        # drop the last period since its 'next_period_return' cannot be calculated
         self.df_backtest = self.df_backtest[self.df_backtest['date'] != self.df_backtest['date'].max()]
-        #sort the dataframe by date and stocks
+        # sort the dataframe by date and stocks
         self.df_backtest = self.df_backtest.sort_values(by=INDEX_COLS, ascending=True)
         # have a (date, stock) multi-index dataframe
         self.df_backtest = self.df_backtest.set_index(INDEX_COLS)
         # filter out unnecessary columns
         self.df_backtest = self.df_backtest.loc[:, self.df_backtest.columns.isin(NECESSARY_COLS)]
-        #add primary and secondary industry codes to the dataframe
+        # add primary and secondary industry codes to the dataframe
         self.df_backtest = self.df_backtest.merge(dl.load_industry_mapping()[INDUSTRY_COLS], how='left', left_on='stock', right_index=True, )
 
     def run(self):
@@ -127,7 +129,7 @@ def add_factors(df_backtest: pd.DataFrame, factors: dict):
     def get_factor_data(file_path): #each call takes around 3 to 4 seconds
         df_factor = pd.read_hdf(file_path)
         df_factor = df_factor.reset_index().rename(columns={'order_book_id': 'stock'})
-        df_factor = df_factor[df_factor['date'].isin(rebalancing_dates)].set_index(INDEX_COLS).sort_index()
+        df_factor = df_factor[df_factor['date'].isin(REBALANCING_DATES)].set_index(INDEX_COLS).sort_index()
         return df_factor
 
     with pathos.multiprocessing.ProcessPool(pathos.helpers.cpu_count()) as pool:
