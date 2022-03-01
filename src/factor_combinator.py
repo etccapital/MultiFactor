@@ -29,7 +29,7 @@ class FactorCombinator:
             factor_type (str): the type of factor in 'factors' e.g. value
             standardize_factors (bool, optional): whether to standardize the factors before calculting the weights and combining them. Defaults to False.
             df_backtest (pd.DataFrame, optional): (date, stock) multi-index dataframe that specifies all the basic information of each stock on each rebalancing date. 
-                                            Must contain at least these columns: 'market_value', 'pri_indus_code', 'next_period_return'
+                                            Must contain at least these columns: 'market_value', primary industry, 'next_period_return'
                                             Defaults to df_backtest.
         """
         self.factors = factors
@@ -131,14 +131,14 @@ class FactorCombinatorByIC(FactorCombinator):
             #      otherwise each subprocess will make copies of original dataframe causing lots of unnecessary extra memory/overhead
             factor = df_sub.columns[-1]
             import statsmodels.formula.api as smf
-            factor_resid = smf.wls(formula = f"{factor} ~ 0 + market_value + C(pri_indus_code)", 
+            factor_resid = smf.wls(formula = f"{factor} ~ 0 + market_value + C({PRIMARY_INDUSTRY_COL})", 
                             data=df_sub, weights = df_sub['market_value'] ** 0.5).fit().resid
             ic_val = pd.concat([df_sub['next_period_return'], factor_resid], axis=1).corr(method='spearman').iloc[0, 1]
             return ic_val
             # df_ic_series.loc[date, factor] = ic_val
 
         def get_df_sub(date, factor):
-            return self.df_backtest.loc[date, ['market_value', 'pri_indus_code', 'next_period_return'] + [factor]]
+            return self.df_backtest.loc[date, ['market_value', PRIMARY_INDUSTRY_COL, 'next_period_return'] + [factor]]
         inputs = [(date, factor) for date in self.df_backtest.index.get_level_values(0).unique() for factor in self.factors]
         with pathos.multiprocessing.Pool(pathos.helpers.cpu_count()) as pool:
             results = pool.map(set_ic_value, [get_df_sub(date, factor) for date, factor in inputs])

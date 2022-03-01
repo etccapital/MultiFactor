@@ -12,10 +12,15 @@ industry_codes = [f'A0{i}' for i in range(1, 6)] + [f'B0{i}' for i in range(6, 1
     [f'R{i}' for i in range(85, 90)] + ['S90']
 
 #backtesting timeframe
-START_DATE = '20110101'
-END_DATE = '20201231'
-rebalancing_dates = pd.date_range(start=START_DATE, end=END_DATE, freq='BM')
+START_DATE = '2011-01-01'
+END_DATE = '2020-12-31'
+REBALANCING_DATES = pd.to_datetime(pd.read_hdf(os.path.join(DATAPATH, 'raw_data', 'rebalancing_dates.h5')).values)
+#Ensure that there is a rebalancing date on every month i.e. the time window between two rebalancing dates can be
+#no longer than 40 days
+assert( ((REBALANCING_DATES[1:] - REBALANCING_DATES[:-1]) > pd.Timedelta('40d') ).sum() == 0)
 
 INDEX_COLS = ['date', 'stock']
-INDUSTRY_COLS = ['一级行业', '二级行业']
+PRIMARY_INDUSTRY_COL = '一级行业'
+SECONDARY_INDUSTRY_COL = '二级行业'
+INDUSTRY_COLS = [PRIMARY_INDUSTRY_COL, SECONDARY_INDUSTRY_COL]
 NECESSARY_COLS = ['market_value', 'open', 'close', 'next_period_return', ] + INDUSTRY_COLS

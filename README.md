@@ -97,6 +97,7 @@ Whenever you change the folder structure, please update the following diagram.
 │   │   ├── is_suspended.h5
 │   │   ├── listed_dates.h5
 │   │   ├── stock_names.h5
+│   │   ├── rebalancing_dates.h5
 │   │   └── industry_code_to_names.xlsx
 │   ├── stock_data
 │   │   ├── sh600000.csv
