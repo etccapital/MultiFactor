@@ -75,6 +75,9 @@ value_factors_ic_combinator = comb.FactorCombinatorByIC(factor_type='value',
 value_factors_ic_combinator.run()
 
 # %%
+value_factors_ic_combinator.df_opt_factor_weights
+
+# %%
 value_factors_ic_combinator.df_backtest['combined_factor']
 
 # %%
