@@ -60,7 +60,7 @@ To save your time, we have made the following shell scripts/makefiles:
 
 ## Project structure
 Use command `tree` in command line to generate the following folder structure. 
-Whenever you change the folder structure, please update the following diagram.
+Whenever you change the folder structure, please update the following diagram and update the corresponding file to the OneDrive folder.
 ```
 .
 ├── Data
