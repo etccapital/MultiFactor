@@ -77,6 +77,7 @@ class TimeAndStockFilter:
             num_nonlisted_stock.plot.line()
             plt.show()
     
+    @timer
     def postprocess(self):
         """
         step 3: postprocess the dataframe into desired format
@@ -106,11 +107,11 @@ class TimeAndStockFilter:
         return self.df_backtest
 
 @timer
-def add_factors(df_backtest: pd.DataFrame, factors: dict):
+def add_factors(df_backtest: pd.DataFrame, style_factor_dict: dict):
     """get factor data and merge it onto the original backtesting framework
     Args:
         df_backtest (pd.DataFrame): a pandas dataframe used for backtesting. It has multi-index (date, stock)
-        factors (dict): a dictionary mapping factor types to factor lists
+        style_factor_dict (dict): a dictionary mapping factor types to factor lists
                         e.g. {'value': ['pe_ratio_ttm', 'pb_ratio_ttm', ],
                                 }
                         in order for factor data to be correctly read in,
@@ -121,7 +122,7 @@ def add_factors(df_backtest: pd.DataFrame, factors: dict):
     df_backtest = df_backtest.copy()
     def get_factor_path(type, factor):
         return os.path.join(DATAPATH, 'factor', type, factor + ".h5")
-    all_factor_paths = [[get_factor_path(type, factor) for factor in factor_list] for type, factor_list in factors.items()]
+    all_factor_paths = [[get_factor_path(type, factor) for factor in factor_list] for type, factor_list in style_factor_dict.items()]
     all_factor_paths = sum( all_factor_paths, [])
     # all_factor_paths = [path for path in all_factor_paths if path not in df_backtest.columns]
     print(all_factor_paths)
@@ -136,23 +137,33 @@ def add_factors(df_backtest: pd.DataFrame, factors: dict):
     # with ThreadPoolExecutor() as pool:
         factor_results = pool.map(get_factor_data, all_factor_paths)
     df_factor = pd.concat(factor_results, axis=1)
-
     df_factor = df_factor.replace([np.inf, -np.inf], np.nan)  
     df_backtest = df_backtest.merge(df_factor, how='left', left_index=True, right_index=True)
     return df_backtest
 
 @timer
-def standardize_factors(df, factors, remove_outlier_or_not=True, standardize_or_not=True, fill_na_or_not=True, filter_out_missing_values_or_not=True):
+def standardize_factors(df: pd.DataFrame, factors: list, remove_outlier_or_not=True, standardize_or_not=True, fill_na_or_not=True, filter_out_missing_values_or_not=True):
     """
-    This function filters dataframe with the following steps
-
+    This function preprocesses dataframe with the following steps
     step 1: Replace Outliers with the corresponding threshold
     step 2: Standardization - Subtract mean and divide by std
     step 3: Fill missing factor values with 0
     step 4: Filter out entries with missing return values
+
+    Args:
+        df (pd.DataFrame): a pandas dataframe used for backtesting. It has multi-index (date, stock)
+        factors (Iterable): a list of factors
+        remove_outlier_or_not (bool, optional): Defaults to True.
+        standardize_or_not (bool, optional): Defaults to True.
+        fill_na_or_not (bool, optional): Defaults to True.
+        filter_out_missing_values_or_not (bool, optional): Defaults to True.
+
+    Returns:
+        _type_: _description_
     """
 
     assert(factors is not None)
+    assert(set(factors).issubset(set(df.columns)))
 
     df = df.copy()  
 

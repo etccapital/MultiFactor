@@ -118,6 +118,7 @@ Whenever you change the folder structure, please update the following diagram an
 │   ├── data_download.ipynb
 │   ├── data_download_and_process.ipynb
 │   ├── factor_combination.ipynb
+│   ├── portfolio_optimization.ipynb
 │   └── single_factor_analysis.ipynb
 ├── rq_credential.json
 ├── scripted_notebook
@@ -126,11 +127,13 @@ Whenever you change the folder structure, please update the following diagram an
 │   ├── data_download.py
 │   ├── data_download_and_process.py
 │   ├── factor_combination.py
+│   ├── portfolio_optimization.py
 │   └── single_factor_analysis.py
 └── src
     ├── __init__.py
     ├── constants.py
     ├── dataloader.py
-    ├── factor_combinator.py
+    ├── factor_combinator.py    
+    ├── portfolio_optimizer.py
     ├── preprocess.py
     └── utils.py

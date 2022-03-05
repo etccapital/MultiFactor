@@ -44,8 +44,6 @@ import src.factor_combinator as comb
 
 # %%
 df_basic_info = dl.load_basic_info()
-
-# %%
 filter = preprocess.TimeAndStockFilter(df_basic_info)
 df_backtest = filter.run()
 
@@ -58,7 +56,7 @@ df_backtest = df_backtest.loc[:, df_backtest.columns.isin(NECESSARY_COLS)]
 # %%
 value_factors_uniform_combinator = comb.FactorCombinatorUniform(
                           factor_type='value', 
-                          factors=['pe_ratio_ttm', 'pb_ratio_ttm', 'peg_ratio_ttm', 'book_to_market_ratio_ttm', 'pcf_ratio_ttm', 'ps_ratio_ttm'], 
+                          factors=['ev_ttm.h5', 'pe_ratio_ttm', 'pb_ratio_ttm', 'peg_ratio_ttm', 'book_to_market_ratio_ttm', 'pcf_ratio_ttm', 'ps_ratio_ttm'], 
                           df_backtest=df_backtest, )
 
 # %%
