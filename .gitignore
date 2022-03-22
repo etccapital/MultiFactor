@@ -1,8 +1,10 @@
 __pycache__/
 
+notebook/
+
 *.json
 *.hdf
 *.csv
 *.h5
-*.ipynb
 *.rar
+*.zip
