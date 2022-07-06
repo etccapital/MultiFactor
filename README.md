@@ -120,7 +120,7 @@ Whenever you change the folder structure, please update the following diagram an
     ├── portfolio_optimizer.py
     ├── preprocess.py
     └── utils.py
-
+```  
 ---
 
 ## Version Control of .ipynb Files
@@ -138,5 +138,3 @@ To save your time, we have made the following shell scripts/makefiles:
  `sh ./makefiles/makefile_mac_notebook_to_py.sh` to covert notebooks to scripts 
 
  Note: make sure to update the makefile script if more notebooks are added
-
----
