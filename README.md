@@ -31,24 +31,6 @@ To inspect packages installed or to make changes:
 
 ---
 
-## Version Control of .ipynb Files
-Currently, we have the following notebooks on our local laptops: `data_download_and_process.ipynb`   `Alphalens_single_factor_testing.ipynb`
-However, version control will be impossible if we directly push them to the repo in the form of .ipynb files. This is because jupyter notebooks are               json files and cannot be displayed properly in github. As a result, we will use jupytext(`pip install jupytext --upgrade`) to convert between .ipynb and .py files, and store only .py files in the shared repo. Taking `data_download_and_process.ipynb` as an example, when you finish editing it on your local laptop, run `jupytext --to py:percent data_download_and_process.ipynb` in CMD and the changes will be updated to `data_download_and_process.py`. Then you can merge changes and resolve conflicts in `data_download_and_process.py` as in other python files. To fetch changes from `data_download_and_process.py` to data_download_and_process.ipynb, run `jupytext --to notebook --update data_download_and_process.py` in CMD. Note that the `--update` option is essential as it will only update the code and comments in the .ipynb file while preserving graphs and outputs. \
-
-To save your time, we have made the following shell scripts/makefiles:
-
-(On Windows) \
- `./makefiles/makefile_win.bat "script_to_notebook"` to covert scripts to notebooks \
- `./makefiles/makefile_win.bat "notebook_to_script"` to covert notebooks to scripts 
-
-(On Mac) \
- `sh ./makefiles/makefile_mac_py_to_notebook.sh` to covert scripts to notebooks \
- `sh ./makefiles/makefile_mac_notebook_to_py.sh` to covert notebooks to scripts 
-
- Note: make sure to update the makefile script if more notebooks are added
-
----
-
 ## Workflow
 
 1. Download zipped price data and extract them to `.data/price`
@@ -138,3 +120,21 @@ Whenever you change the folder structure, please update the following diagram an
     ├── portfolio_optimizer.py
     ├── preprocess.py
     └── utils.py
+
+## Version Control of .ipynb Files
+Currently, we have the following notebooks on our local laptops: `data_download_and_process.ipynb`   `Alphalens_single_factor_testing.ipynb`
+However, version control will be impossible if we directly push them to the repo in the form of .ipynb files. This is because jupyter notebooks are               json files and cannot be displayed properly in github. As a result, we will use jupytext(`pip install jupytext --upgrade`) to convert between .ipynb and .py files, and store only .py files in the shared repo. Taking `data_download_and_process.ipynb` as an example, when you finish editing it on your local laptop, run `jupytext --to py:percent data_download_and_process.ipynb` in CMD and the changes will be updated to `data_download_and_process.py`. Then you can merge changes and resolve conflicts in `data_download_and_process.py` as in other python files. To fetch changes from `data_download_and_process.py` to data_download_and_process.ipynb, run `jupytext --to notebook --update data_download_and_process.py` in CMD. Note that the `--update` option is essential as it will only update the code and comments in the .ipynb file while preserving graphs and outputs. \
+
+To save your time, we have made the following shell scripts/makefiles:
+
+(On Windows) \
+ `./makefiles/makefile_win.bat "script_to_notebook"` to covert scripts to notebooks \
+ `./makefiles/makefile_win.bat "notebook_to_script"` to covert notebooks to scripts 
+
+(On Mac) \
+ `sh ./makefiles/makefile_mac_py_to_notebook.sh` to covert scripts to notebooks \
+ `sh ./makefiles/makefile_mac_notebook_to_py.sh` to covert notebooks to scripts 
+
+ Note: make sure to update the makefile script if more notebooks are added
+
+---
