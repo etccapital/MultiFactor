@@ -3,8 +3,9 @@
 ![](Multi-Factor%20Workflow.png)
 
 ## Description
-This is a practical multi-factor backtesting framework from scratch based on Huatai Security's(one of China's largest sell side) financial engineering report. Steps include factor data collection and preprocessing, single factor testing, building return model, building risk model, and result analysis.
+This is a practical multi-factor backtesting framework from scratch based on Huatai Security's(one of China's largest sell side) financial engineering report, as a part of the quantitative finance research project development in [ETC Investment Group](https://etccapital.ca/). Steps include factor data collection and preprocessing, single factor testing, building return model, building risk model, and result analysis. 
 
+Do not distribute for use without explicit consent from contributing members of ETC Quant. 
 ---
 
 ## Project environment
